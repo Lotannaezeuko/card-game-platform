@@ -4,6 +4,8 @@ const express = require('express');
 const cors = require('cors');
 
 const authRoutes = require('./routes/auth');
+const deckRoutes = require('./routes/decks');
+const cardRoutes = require('./routes/cards');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -17,6 +19,8 @@ app.use(express.json());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/decks', deckRoutes);
+app.use('/api/cards', cardRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

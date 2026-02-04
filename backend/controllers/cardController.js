@@ -1,6 +1,5 @@
 const db = require('../db');
 
-const VALID_CARD_TYPES = ['character', 'spell', 'item', 'event', 'location'];
 const DEFAULT_LIMIT = 50;
 
 const getAllCards = async (req, res) => {
@@ -95,14 +94,8 @@ const createCard = async (req, res) => {
       return res.status(400).json({ error: 'Card name is required' });
     }
 
-    if (!card_type) {
+    if (!card_type || card_type.trim() === '') {
       return res.status(400).json({ error: 'Card type is required' });
-    }
-
-    if (!VALID_CARD_TYPES.includes(card_type)) {
-      return res.status(400).json({
-        error: `Invalid card type. Must be one of: ${VALID_CARD_TYPES.join(', ')}`,
-      });
     }
 
     if (!content || content.trim() === '') {
@@ -146,12 +139,6 @@ const updateCard = async (req, res) => {
 
     if (cardResult.rows[0].created_by_user_id !== req.user.userId) {
       return res.status(403).json({ error: 'Access denied. You are not the card creator.' });
-    }
-
-    if (card_type && !VALID_CARD_TYPES.includes(card_type)) {
-      return res.status(400).json({
-        error: `Invalid card type. Must be one of: ${VALID_CARD_TYPES.join(', ')}`,
-      });
     }
 
     if (card_name !== undefined && card_name.trim() === '') {

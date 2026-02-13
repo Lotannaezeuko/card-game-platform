@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const deckRoutes = require('./routes/decks');
 const cardRoutes = require('./routes/cards');
 const ruleRoutes = require('./routes/rules');
+const gameRoutes = require('./routes/games');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -23,6 +24,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/decks', deckRoutes);
 app.use('/api/cards', cardRoutes);
 app.use('/api/rules', ruleRoutes);
+app.use('/api/games', gameRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

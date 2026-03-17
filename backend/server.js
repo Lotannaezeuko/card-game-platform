@@ -6,7 +6,6 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const deckRoutes = require('./routes/decks');
 const cardRoutes = require('./routes/cards');
-const ruleRoutes = require('./routes/rules');
 const gameRoutes = require('./routes/games');
 
 const app = express();
@@ -23,7 +22,6 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/decks', deckRoutes);
 app.use('/api/cards', cardRoutes);
-app.use('/api/rules', ruleRoutes);
 app.use('/api/games', gameRoutes);
 
 // Health check

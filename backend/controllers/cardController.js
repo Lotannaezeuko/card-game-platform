@@ -4,13 +4,14 @@ const DEFAULT_LIMIT = 50;
 
 const getAllCards = async (req, res) => {
   try {
-    const { card_type, created_by, limit, offset } = req.query;
+    const { created_by, limit, offset } = req.query;
 
     const queryLimit = Math.min(parseInt(limit) || DEFAULT_LIMIT, 100);
     const queryOffset = parseInt(offset) || 0;
 
     let query = `
-      SELECT c.card_id, c.card_name, c.card_type, c.content, c.image_url,
+      SELECT c.card_id, c.card_name, c.front_text, c.front_image_url,
+             c.back_text, c.back_image_url, c.default_copies, c.is_unique,
              c.attributes, c.created_at, c.updated_at,
              c.created_by_user_id, u.username AS creator_username
       FROM cards c
@@ -19,11 +20,6 @@ const getAllCards = async (req, res) => {
     `;
     const params = [];
     let paramIndex = 1;
-
-    if (card_type) {
-      query += ` AND c.card_type = $${paramIndex++}`;
-      params.push(card_type);
-    }
 
     if (created_by) {
       query += ` AND c.created_by_user_id = $${paramIndex++}`;
@@ -38,11 +34,9 @@ const getAllCards = async (req, res) => {
     const countQuery = `
       SELECT COUNT(*) FROM cards c
       WHERE 1=1
-      ${card_type ? 'AND c.card_type = $1' : ''}
-      ${created_by ? `AND c.created_by_user_id = $${card_type ? 2 : 1}` : ''}
+      ${created_by ? 'AND c.created_by_user_id = $1' : ''}
     `;
     const countParams = [];
-    if (card_type) countParams.push(card_type);
     if (created_by) countParams.push(created_by);
 
     const countResult = await db.query(countQuery, countParams);
@@ -66,7 +60,8 @@ const getCardById = async (req, res) => {
     const { card_id } = req.params;
 
     const result = await db.query(
-      `SELECT c.card_id, c.card_name, c.card_type, c.content, c.image_url,
+      `SELECT c.card_id, c.card_name, c.front_text, c.front_image_url,
+              c.back_text, c.back_image_url, c.default_copies, c.is_unique,
               c.attributes, c.created_at, c.updated_at,
               c.created_by_user_id, u.username AS creator_username, u.email AS creator_email
        FROM cards c
@@ -88,30 +83,38 @@ const getCardById = async (req, res) => {
 
 const createCard = async (req, res) => {
   try {
-    const { card_name, card_type, content, image_url, attributes } = req.body;
+    const {
+      card_name,
+      front_text,
+      front_image_url,
+      back_text,
+      back_image_url,
+      default_copies,
+      is_unique,
+      attributes,
+    } = req.body;
 
     if (!card_name || card_name.trim() === '') {
       return res.status(400).json({ error: 'Card name is required' });
     }
 
-    if (!card_type || card_type.trim() === '') {
-      return res.status(400).json({ error: 'Card type is required' });
-    }
-
-    if (!content || content.trim() === '') {
-      return res.status(400).json({ error: 'Card content is required' });
+    if (!front_text || front_text.trim() === '') {
+      return res.status(400).json({ error: 'Card front text is required' });
     }
 
     const result = await db.query(
-      `INSERT INTO cards (created_by_user_id, card_name, card_type, content, image_url, attributes)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING card_id, card_name, card_type, content, image_url, attributes, created_at`,
+      `INSERT INTO cards (created_by_user_id, card_name, front_text, front_image_url, back_text, back_image_url, default_copies, is_unique, attributes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING card_id, card_name, front_text, front_image_url, back_text, back_image_url, default_copies, is_unique, attributes, created_at`,
       [
         req.user.userId,
         card_name.trim(),
-        card_type,
-        content.trim(),
-        image_url || null,
+        front_text.trim(),
+        front_image_url || null,
+        back_text || null,
+        back_image_url || null,
+        default_copies !== undefined ? default_copies : 1,
+        is_unique !== undefined ? is_unique : false,
         attributes ? JSON.stringify(attributes) : '{}',
       ]
     );
@@ -126,7 +129,16 @@ const createCard = async (req, res) => {
 const updateCard = async (req, res) => {
   try {
     const { card_id } = req.params;
-    const { card_name, card_type, content, image_url, attributes } = req.body;
+    const {
+      card_name,
+      front_text,
+      front_image_url,
+      back_text,
+      back_image_url,
+      default_copies,
+      is_unique,
+      attributes,
+    } = req.body;
 
     const cardResult = await db.query(
       'SELECT created_by_user_id FROM cards WHERE card_id = $1',
@@ -153,17 +165,29 @@ const updateCard = async (req, res) => {
       updates.push(`card_name = $${paramIndex++}`);
       values.push(card_name.trim());
     }
-    if (card_type !== undefined) {
-      updates.push(`card_type = $${paramIndex++}`);
-      values.push(card_type);
+    if (front_text !== undefined) {
+      updates.push(`front_text = $${paramIndex++}`);
+      values.push(front_text.trim());
     }
-    if (content !== undefined) {
-      updates.push(`content = $${paramIndex++}`);
-      values.push(content.trim());
+    if (front_image_url !== undefined) {
+      updates.push(`front_image_url = $${paramIndex++}`);
+      values.push(front_image_url);
     }
-    if (image_url !== undefined) {
-      updates.push(`image_url = $${paramIndex++}`);
-      values.push(image_url);
+    if (back_text !== undefined) {
+      updates.push(`back_text = $${paramIndex++}`);
+      values.push(back_text);
+    }
+    if (back_image_url !== undefined) {
+      updates.push(`back_image_url = $${paramIndex++}`);
+      values.push(back_image_url);
+    }
+    if (default_copies !== undefined) {
+      updates.push(`default_copies = $${paramIndex++}`);
+      values.push(default_copies);
+    }
+    if (is_unique !== undefined) {
+      updates.push(`is_unique = $${paramIndex++}`);
+      values.push(is_unique);
     }
     if (attributes !== undefined) {
       updates.push(`attributes = $${paramIndex++}`);
@@ -179,7 +203,7 @@ const updateCard = async (req, res) => {
 
     const result = await db.query(
       `UPDATE cards SET ${updates.join(', ')} WHERE card_id = $${paramIndex}
-       RETURNING card_id, card_name, card_type, content, image_url, attributes, created_at, updated_at`,
+       RETURNING card_id, card_name, front_text, front_image_url, back_text, back_image_url, default_copies, is_unique, attributes, created_at, updated_at`,
       values
     );
 

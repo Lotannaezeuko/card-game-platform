@@ -27,7 +27,7 @@ afterEach(() => {
 
 describe('getAllDecks', () => {
   it('should return public decks when is_public=true', async () => {
-    const decks = [{ deck_id: 1, deck_name: 'Public Deck', is_public: true }];
+    const decks = [{ deck_id: 1, deck_name: 'Public Deck', is_public: true, shuffle_behaviour: 'shuffle_before_game' }];
     db.query.mockResolvedValue({ rows: decks });
 
     const req = { query: { is_public: 'true' }, user: { userId: 1 } };
@@ -36,13 +36,12 @@ describe('getAllDecks', () => {
     await getAllDecks(req, res);
 
     expect(res.json).toHaveBeenCalledWith({ decks });
-    // Verify the query doesn't include user_id filter for public decks
     const queryStr = db.query.mock.calls[0][0];
     expect(queryStr).toContain('d.is_public = true');
   });
 
   it('should return user decks when is_public is not true', async () => {
-    const decks = [{ deck_id: 1, deck_name: 'My Deck', user_id: 1 }];
+    const decks = [{ deck_id: 1, deck_name: 'My Deck', user_id: 1, shuffle_behaviour: 'shuffle_before_game' }];
     db.query.mockResolvedValue({ rows: decks });
 
     const req = { query: {}, user: { userId: 1 } };
@@ -53,6 +52,21 @@ describe('getAllDecks', () => {
     expect(res.json).toHaveBeenCalledWith({ decks });
     const queryParams = db.query.mock.calls[0][1];
     expect(queryParams).toEqual([1]);
+  });
+
+  it('should include new deck fields in query', async () => {
+    db.query.mockResolvedValue({ rows: [] });
+
+    const req = { query: {}, user: { userId: 1 } };
+    const res = mockRes();
+
+    await getAllDecks(req, res);
+
+    const queryStr = db.query.mock.calls[0][0];
+    expect(queryStr).toContain('shuffle_behaviour');
+    expect(queryStr).toContain('duplicate_handling');
+    expect(queryStr).toContain('total_cards');
+    expect(queryStr).toContain('unique_cards');
   });
 
   it('should return 500 on database error', async () => {
@@ -96,8 +110,15 @@ describe('getDeckById', () => {
   });
 
   it('should return deck with cards for owner', async () => {
-    const deck = { deck_id: 1, user_id: 1, deck_name: 'My Deck', is_public: false };
-    const cards = [{ card_id: 1, card_name: 'Fireball', quantity: 2 }];
+    const deck = {
+      deck_id: 1,
+      user_id: 1,
+      deck_name: 'My Deck',
+      is_public: false,
+      shuffle_behaviour: 'shuffle_before_game',
+      duplicate_handling: 'allow_duplicates',
+    };
+    const cards = [{ card_id: 1, card_name: 'Fireball', front_text: 'Deal damage', quantity: 2 }];
 
     db.query
       .mockResolvedValueOnce({ rows: [deck] })
@@ -112,8 +133,15 @@ describe('getDeckById', () => {
   });
 
   it('should return public deck with cards for non-owner', async () => {
-    const deck = { deck_id: 1, user_id: 2, deck_name: 'Public Deck', is_public: true };
-    const cards = [{ card_id: 1, card_name: 'Fireball' }];
+    const deck = {
+      deck_id: 1,
+      user_id: 2,
+      deck_name: 'Public Deck',
+      is_public: true,
+      shuffle_behaviour: 'shuffle_before_game',
+      duplicate_handling: 'allow_duplicates',
+    };
+    const cards = [{ card_id: 1, card_name: 'Fireball', front_text: 'Deal damage' }];
 
     db.query
       .mockResolvedValueOnce({ rows: [deck] })
@@ -125,6 +153,24 @@ describe('getDeckById', () => {
     await getDeckById(req, res);
 
     expect(res.json).toHaveBeenCalledWith({ ...deck, cards });
+  });
+
+  it('should use updated card fields in cards query', async () => {
+    const deck = { deck_id: 1, user_id: 1, is_public: true };
+    db.query
+      .mockResolvedValueOnce({ rows: [deck] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const req = { params: { deck_id: 1 }, user: { userId: 1 } };
+    const res = mockRes();
+
+    await getDeckById(req, res);
+
+    const cardsQueryStr = db.query.mock.calls[1][0];
+    expect(cardsQueryStr).toContain('front_text');
+    expect(cardsQueryStr).toContain('front_image_url');
+    expect(cardsQueryStr).toContain('back_text');
+    expect(cardsQueryStr).toContain('back_image_url');
   });
 
   it('should return 500 on database error', async () => {
@@ -171,7 +217,14 @@ describe('createDeck', () => {
   });
 
   it('should create deck successfully', async () => {
-    const newDeck = { deck_id: 1, deck_name: 'New Deck', is_public: false, created_at: '2024-01-01' };
+    const newDeck = {
+      deck_id: 1,
+      deck_name: 'New Deck',
+      is_public: false,
+      shuffle_behaviour: 'shuffle_before_game',
+      duplicate_handling: 'allow_duplicates',
+      created_at: '2024-01-01',
+    };
     db.query.mockResolvedValue({ rows: [newDeck] });
 
     const req = { body: { deck_name: 'New Deck', description: 'A test deck' }, user: { userId: 1 } };
@@ -181,6 +234,30 @@ describe('createDeck', () => {
 
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith(newDeck);
+  });
+
+  it('should create deck with new fields', async () => {
+    db.query.mockResolvedValue({ rows: [{ deck_id: 1 }] });
+
+    const req = {
+      body: {
+        deck_name: 'New Deck',
+        total_cards: 60,
+        unique_cards: 20,
+        shuffle_behaviour: 'no_shuffle',
+        duplicate_handling: 'no_duplicates',
+      },
+      user: { userId: 1 },
+    };
+    const res = mockRes();
+
+    await createDeck(req, res);
+
+    const insertParams = db.query.mock.calls[0][1];
+    expect(insertParams[4]).toBe(60);
+    expect(insertParams[5]).toBe(20);
+    expect(insertParams[6]).toBe('no_shuffle');
+    expect(insertParams[7]).toBe('no_duplicates');
   });
 
   it('should default is_public to false', async () => {
@@ -193,6 +270,19 @@ describe('createDeck', () => {
 
     const insertParams = db.query.mock.calls[0][1];
     expect(insertParams[3]).toBe(false);
+  });
+
+  it('should default shuffle_behaviour and duplicate_handling', async () => {
+    db.query.mockResolvedValue({ rows: [{ deck_id: 1 }] });
+
+    const req = { body: { deck_name: 'New Deck' }, user: { userId: 1 } };
+    const res = mockRes();
+
+    await createDeck(req, res);
+
+    const insertParams = db.query.mock.calls[0][1];
+    expect(insertParams[6]).toBe('shuffle_before_game');
+    expect(insertParams[7]).toBe('allow_duplicates');
   });
 
   it('should return 500 on database error', async () => {
@@ -275,6 +365,30 @@ describe('updateDeck', () => {
       .mockResolvedValueOnce({ rows: [updatedDeck] });
 
     const req = { params: { deck_id: 1 }, body: { deck_name: 'Updated Deck', is_public: true }, user: { userId: 1 } };
+    const res = mockRes();
+
+    await updateDeck(req, res);
+
+    expect(res.json).toHaveBeenCalledWith(updatedDeck);
+  });
+
+  it('should update new deck fields', async () => {
+    const updatedDeck = {
+      deck_id: 1,
+      shuffle_behaviour: 'no_shuffle',
+      duplicate_handling: 'no_duplicates',
+      total_cards: 40,
+      unique_cards: 15,
+    };
+    db.query
+      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] })
+      .mockResolvedValueOnce({ rows: [updatedDeck] });
+
+    const req = {
+      params: { deck_id: 1 },
+      body: { shuffle_behaviour: 'no_shuffle', duplicate_handling: 'no_duplicates', total_cards: 40, unique_cards: 15 },
+      user: { userId: 1 },
+    };
     const res = mockRes();
 
     await updateDeck(req, res);

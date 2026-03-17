@@ -40,7 +40,7 @@ describe('getAllGames', () => {
     expect(res.json).toHaveBeenCalledWith({ games });
   });
 
-  it('should filter active games when active=true', async () => {
+  it('should filter active games using status enum when active=true', async () => {
     db.query.mockResolvedValue({ rows: [] });
 
     const req = { query: { active: 'true' }, user: { userId: 1 } };
@@ -49,10 +49,10 @@ describe('getAllGames', () => {
     await getAllGames(req, res);
 
     const queryStr = db.query.mock.calls[0][0];
-    expect(queryStr).toContain('ended_at IS NULL');
+    expect(queryStr).toContain("status != 'ended'");
   });
 
-  it('should not filter by active when param is absent', async () => {
+  it('should not filter by status when active param is absent', async () => {
     db.query.mockResolvedValue({ rows: [] });
 
     const req = { query: {}, user: { userId: 1 } };
@@ -61,7 +61,7 @@ describe('getAllGames', () => {
     await getAllGames(req, res);
 
     const queryStr = db.query.mock.calls[0][0];
-    expect(queryStr).not.toContain('ended_at IS NULL');
+    expect(queryStr).not.toContain("status != 'ended'");
   });
 
   it('should return 500 on database error', async () => {
@@ -92,7 +92,7 @@ describe('getGameById', () => {
   it('should return 403 if user is not host or player', async () => {
     db.query
       .mockResolvedValueOnce({ rows: [{ game_id: 1, host_user_id: 2 }] })
-      .mockResolvedValueOnce({ rows: [{ user_id: 3 }] }); // only player is user 3
+      .mockResolvedValueOnce({ rows: [{ user_id: 3 }] });
 
     const req = { params: { game_id: 1 }, user: { userId: 1 } };
     const res = mockRes();
@@ -104,7 +104,7 @@ describe('getGameById', () => {
   });
 
   it('should return game with players for host', async () => {
-    const game = { game_id: 1, host_user_id: 1, deck_name: 'Deck' };
+    const game = { game_id: 1, host_user_id: 1, deck_name: 'Deck', game_code: 'ABC123' };
     const players = [{ user_id: 1, username: 'host' }, { user_id: 2, username: 'player2' }];
 
     db.query
@@ -120,7 +120,7 @@ describe('getGameById', () => {
   });
 
   it('should return game with players for non-host player', async () => {
-    const game = { game_id: 1, host_user_id: 2, deck_name: 'Deck' };
+    const game = { game_id: 1, host_user_id: 2, deck_name: 'Deck', game_code: 'ABC123' };
     const players = [{ user_id: 2, username: 'host' }, { user_id: 1, username: 'me' }];
 
     db.query
@@ -182,12 +182,13 @@ describe('createGame', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Access denied. You do not own this deck.' });
   });
 
-  it('should create game and add host as player', async () => {
-    const game = { game_id: 1, deck_id: 1, host_user_id: 1, is_online: false };
+  it('should create game with game_code and add host as player', async () => {
+    const game = { game_id: 1, deck_id: 1, host_user_id: 1, is_online: false, game_code: 'ABC123' };
     db.query
       .mockResolvedValueOnce({ rows: [{ user_id: 1 }] }) // deck check
-      .mockResolvedValueOnce({ rows: [game] }) // insert game
-      .mockResolvedValueOnce({}); // insert player
+      .mockResolvedValueOnce({ rows: [] })               // game_code uniqueness check
+      .mockResolvedValueOnce({ rows: [game] })           // insert game
+      .mockResolvedValueOnce({});                        // insert player
 
     const req = { body: { deck_id: 1 }, user: { userId: 1 } };
     const res = mockRes();
@@ -196,14 +197,32 @@ describe('createGame', () => {
 
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith({ game, message: 'Game created successfully' });
-    // Verify host was added as player at position 1
-    const playerInsert = db.query.mock.calls[2];
+
+    const playerInsert = db.query.mock.calls[3];
     expect(playerInsert[1]).toEqual([1, 1]);
+  });
+
+  it('should include game_code in insert params', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ game_id: 1, game_code: 'XYZ789' }] })
+      .mockResolvedValueOnce({});
+
+    const req = { body: { deck_id: 1 }, user: { userId: 1 } };
+    const res = mockRes();
+
+    await createGame(req, res);
+
+    const gameInsertParams = db.query.mock.calls[2][1];
+    expect(typeof gameInsertParams[2]).toBe('string');
+    expect(gameInsertParams[2].length).toBe(6);
   });
 
   it('should default is_online to false', async () => {
     db.query
       .mockResolvedValueOnce({ rows: [{ user_id: 1 }] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ game_id: 1 }] })
       .mockResolvedValueOnce({});
 
@@ -212,13 +231,14 @@ describe('createGame', () => {
 
     await createGame(req, res);
 
-    const gameInsertParams = db.query.mock.calls[1][1];
-    expect(gameInsertParams[2]).toBe(false);
+    const gameInsertParams = db.query.mock.calls[2][1];
+    expect(gameInsertParams[3]).toBe(false);
   });
 
   it('should pass is_online when provided', async () => {
     db.query
       .mockResolvedValueOnce({ rows: [{ user_id: 1 }] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ game_id: 1 }] })
       .mockResolvedValueOnce({});
 
@@ -227,8 +247,66 @@ describe('createGame', () => {
 
     await createGame(req, res);
 
-    const gameInsertParams = db.query.mock.calls[1][1];
-    expect(gameInsertParams[2]).toBe(true);
+    const gameInsertParams = db.query.mock.calls[2][1];
+    expect(gameInsertParams[3]).toBe(true);
+  });
+
+  it('should include starting_hand_size, turn_direction, deal_method in insert', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ game_id: 1 }] })
+      .mockResolvedValueOnce({});
+
+    const req = {
+      body: { deck_id: 1, starting_hand_size: 7, turn_direction: 'counterclockwise', deal_method: 'one_at_a_time' },
+      user: { userId: 1 },
+    };
+    const res = mockRes();
+
+    await createGame(req, res);
+
+    const gameInsertParams = db.query.mock.calls[2][1];
+    expect(gameInsertParams[4]).toBe(7);
+    expect(gameInsertParams[5]).toBe('counterclockwise');
+    expect(gameInsertParams[6]).toBe('one_at_a_time');
+  });
+
+  it('should default starting_hand_size, turn_direction, deal_method', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ game_id: 1 }] })
+      .mockResolvedValueOnce({});
+
+    const req = { body: { deck_id: 1 }, user: { userId: 1 } };
+    const res = mockRes();
+
+    await createGame(req, res);
+
+    const gameInsertParams = db.query.mock.calls[2][1];
+    expect(gameInsertParams[4]).toBe(5);
+    expect(gameInsertParams[5]).toBe('clockwise');
+    expect(gameInsertParams[6]).toBe('full_hand_at_start');
+  });
+
+  it('should retry game_code generation if collision detected', async () => {
+    const game = { game_id: 1, game_code: 'NEW123' };
+    db.query
+      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] })     // deck check
+      .mockResolvedValueOnce({ rows: [{ game_id: 99 }] })    // first code taken
+      .mockResolvedValueOnce({ rows: [] })                   // second code free
+      .mockResolvedValueOnce({ rows: [game] })               // insert game
+      .mockResolvedValueOnce({});                            // insert player
+
+    const req = { body: { deck_id: 1 }, user: { userId: 1 } };
+    const res = mockRes();
+
+    await createGame(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(db.query.mock.calls[1][0]).toContain('game_code');
+    expect(db.query.mock.calls[2][0]).toContain('game_code');
   });
 
   it('should return 500 on database error', async () => {
@@ -277,8 +355,8 @@ describe('updateGameState', () => {
 
   it('should return 404 if game not found after player check', async () => {
     db.query
-      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] }) // player exists
-      .mockResolvedValueOnce({ rows: [] }); // game not found
+      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] })
+      .mockResolvedValueOnce({ rows: [] });
 
     const req = { params: { game_id: 999 }, body: { game_state: { turn: 2 } }, user: { userId: 1 } };
     const res = mockRes();
@@ -291,8 +369,8 @@ describe('updateGameState', () => {
 
   it('should return 400 if game has already ended', async () => {
     db.query
-      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] }) // player exists
-      .mockResolvedValueOnce({ rows: [{ ended_at: '2024-01-01' }] }); // game ended
+      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] })
+      .mockResolvedValueOnce({ rows: [{ ended_at: '2024-01-01' }] });
 
     const req = { params: { game_id: 1 }, body: { game_state: { turn: 2 } }, user: { userId: 1 } };
     const res = mockRes();
@@ -306,9 +384,9 @@ describe('updateGameState', () => {
   it('should update game state successfully', async () => {
     const updatedGame = { game_id: 1, game_state: { turn: 2 } };
     db.query
-      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] }) // player check
-      .mockResolvedValueOnce({ rows: [{ ended_at: null }] }) // active check
-      .mockResolvedValueOnce({ rows: [updatedGame] }); // update
+      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] })
+      .mockResolvedValueOnce({ rows: [{ ended_at: null }] })
+      .mockResolvedValueOnce({ rows: [updatedGame] });
 
     const req = { params: { game_id: 1 }, body: { game_state: { turn: 2 } }, user: { userId: 1 } };
     const res = mockRes();
@@ -367,8 +445,8 @@ describe('endGame', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Game has already ended' });
   });
 
-  it('should end game successfully', async () => {
-    const endedGame = { game_id: 1, ended_at: '2024-01-01T12:00:00Z' };
+  it('should end game and set status to ended', async () => {
+    const endedGame = { game_id: 1, status: 'ended', ended_at: '2024-01-01T12:00:00Z' };
     db.query
       .mockResolvedValueOnce({ rows: [{ host_user_id: 1, ended_at: null }] })
       .mockResolvedValueOnce({ rows: [endedGame] });
@@ -379,6 +457,9 @@ describe('endGame', () => {
     await endGame(req, res);
 
     expect(res.json).toHaveBeenCalledWith({ message: 'Game ended successfully', game: endedGame });
+    const updateQuery = db.query.mock.calls[1][0];
+    expect(updateQuery).toContain("status = 'ended'");
+    expect(updateQuery).toContain('ended_at = CURRENT_TIMESTAMP');
   });
 
   it('should return 500 on database error', async () => {
@@ -420,8 +501,8 @@ describe('addPlayerToGame', () => {
 
   it('should return 409 if player already in game', async () => {
     db.query
-      .mockResolvedValueOnce({ rows: [{ ended_at: null }] }) // game active
-      .mockResolvedValueOnce({ rows: [{ game_player_id: 1 }] }); // already exists
+      .mockResolvedValueOnce({ rows: [{ ended_at: null }] })
+      .mockResolvedValueOnce({ rows: [{ game_player_id: 1 }] });
 
     const req = { params: { game_id: 1 }, body: { user_id: 2 }, user: { userId: 1 } };
     const res = mockRes();
@@ -435,10 +516,10 @@ describe('addPlayerToGame', () => {
   it('should add player successfully', async () => {
     const newPlayer = { game_player_id: 2, game_id: 1, user_id: 2, player_position: 2, score: 0 };
     db.query
-      .mockResolvedValueOnce({ rows: [{ ended_at: null }] }) // game active
-      .mockResolvedValueOnce({ rows: [] }) // not already in game
-      .mockResolvedValueOnce({ rows: [{ next_position: 2 }] }) // next position
-      .mockResolvedValueOnce({ rows: [newPlayer] }); // insert
+      .mockResolvedValueOnce({ rows: [{ ended_at: null }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ next_position: 2 }] })
+      .mockResolvedValueOnce({ rows: [newPlayer] });
 
     const req = { params: { game_id: 1 }, body: { user_id: 2 }, user: { userId: 1 } };
     const res = mockRes();
@@ -452,9 +533,9 @@ describe('addPlayerToGame', () => {
   it('should add anonymous player (no user_id)', async () => {
     const newPlayer = { game_player_id: 3, game_id: 1, user_id: null, player_position: 2, score: 0 };
     db.query
-      .mockResolvedValueOnce({ rows: [{ ended_at: null }] }) // game active
-      .mockResolvedValueOnce({ rows: [{ next_position: 2 }] }) // next position
-      .mockResolvedValueOnce({ rows: [newPlayer] }); // insert
+      .mockResolvedValueOnce({ rows: [{ ended_at: null }] })
+      .mockResolvedValueOnce({ rows: [{ next_position: 2 }] })
+      .mockResolvedValueOnce({ rows: [newPlayer] });
 
     const req = { params: { game_id: 1 }, body: {}, user: { userId: 1 } };
     const res = mockRes();
@@ -463,7 +544,6 @@ describe('addPlayerToGame', () => {
 
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith({ player: newPlayer, message: 'Player added to game' });
-    // Verify null was passed for user_id
     const insertParams = db.query.mock.calls[2][1];
     expect(insertParams[1]).toBeNull();
   });

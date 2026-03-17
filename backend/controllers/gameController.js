@@ -1,5 +1,14 @@
 const db = require('../db');
 
+const generateGameCode = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+};
+
 const getAllGames = async (req, res) => {
   try {
     const { active } = req.query;
@@ -15,7 +24,7 @@ const getAllGames = async (req, res) => {
     const params = [req.user.userId];
 
     if (active === 'true') {
-      query += ' AND g.ended_at IS NULL';
+      query += " AND g.status != 'ended'";
     }
 
     query += ' ORDER BY g.started_at DESC';
@@ -73,7 +82,7 @@ const getGameById = async (req, res) => {
 
 const createGame = async (req, res) => {
   try {
-    const { deck_id, is_online } = req.body;
+    const { deck_id, is_online, starting_hand_size, turn_direction, deal_method } = req.body;
 
     if (!deck_id) {
       return res.status(400).json({ error: 'Deck ID is required' });
@@ -92,11 +101,31 @@ const createGame = async (req, res) => {
       return res.status(403).json({ error: 'Access denied. You do not own this deck.' });
     }
 
+    let game_code;
+    let attempts = 0;
+    while (attempts < 10) {
+      game_code = generateGameCode();
+      const existing = await db.query(
+        'SELECT game_id FROM games WHERE game_code = $1',
+        [game_code]
+      );
+      if (existing.rows.length === 0) break;
+      attempts++;
+    }
+
     const gameResult = await db.query(
-      `INSERT INTO games (deck_id, host_user_id, is_online, game_state)
-       VALUES ($1, $2, $3, '{}')
+      `INSERT INTO games (deck_id, host_user_id, game_code, is_online, starting_hand_size, turn_direction, deal_method, game_state)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, '{}')
        RETURNING *`,
-      [deck_id, req.user.userId, is_online || false]
+      [
+        deck_id,
+        req.user.userId,
+        game_code,
+        is_online || false,
+        starting_hand_size || 5,
+        turn_direction || 'clockwise',
+        deal_method || 'full_hand_at_start',
+      ]
     );
 
     const game = gameResult.rows[0];
@@ -179,7 +208,7 @@ const endGame = async (req, res) => {
     }
 
     const result = await db.query(
-      'UPDATE games SET ended_at = CURRENT_TIMESTAMP WHERE game_id = $1 RETURNING *',
+      "UPDATE games SET status = 'ended', ended_at = CURRENT_TIMESTAMP WHERE game_id = $1 RETURNING *",
       [game_id]
     );
 

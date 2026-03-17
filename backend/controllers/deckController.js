@@ -10,6 +10,7 @@ const getAllDecks = async (req, res) => {
     if (is_public === 'true') {
       query = `
         SELECT d.deck_id, d.user_id, d.deck_name, d.description, d.is_public,
+               d.total_cards, d.unique_cards, d.shuffle_behaviour, d.duplicate_handling,
                d.created_at, d.updated_at, u.username,
                COALESCE(SUM(dc.quantity), 0)::int AS card_count
         FROM decks d
@@ -23,6 +24,7 @@ const getAllDecks = async (req, res) => {
     } else {
       query = `
         SELECT d.deck_id, d.user_id, d.deck_name, d.description, d.is_public,
+               d.total_cards, d.unique_cards, d.shuffle_behaviour, d.duplicate_handling,
                d.created_at, d.updated_at,
                COALESCE(SUM(dc.quantity), 0)::int AS card_count
         FROM decks d
@@ -49,6 +51,7 @@ const getDeckById = async (req, res) => {
 
     const deckResult = await db.query(
       `SELECT d.deck_id, d.user_id, d.deck_name, d.description, d.is_public,
+              d.total_cards, d.unique_cards, d.shuffle_behaviour, d.duplicate_handling,
               d.created_at, d.updated_at, u.username
        FROM decks d
        LEFT JOIN users u ON d.user_id = u.user_id
@@ -67,7 +70,8 @@ const getDeckById = async (req, res) => {
     }
 
     const cardsResult = await db.query(
-      `SELECT c.card_id, c.card_name, c.card_type, c.content, c.image_url,
+      `SELECT c.card_id, c.card_name, c.front_text, c.front_image_url,
+              c.back_text, c.back_image_url, c.default_copies, c.is_unique,
               c.attributes, c.created_at, dc.quantity, dc.card_order
        FROM deck_cards dc
        JOIN cards c ON dc.card_id = c.card_id
@@ -88,7 +92,15 @@ const getDeckById = async (req, res) => {
 
 const createDeck = async (req, res) => {
   try {
-    const { deck_name, description, is_public } = req.body;
+    const {
+      deck_name,
+      description,
+      is_public,
+      total_cards,
+      unique_cards,
+      shuffle_behaviour,
+      duplicate_handling,
+    } = req.body;
 
     if (!deck_name || deck_name.trim() === '') {
       return res.status(400).json({ error: 'Deck name is required' });
@@ -99,10 +111,19 @@ const createDeck = async (req, res) => {
     }
 
     const result = await db.query(
-      `INSERT INTO decks (user_id, deck_name, description, is_public)
-       VALUES ($1, $2, $3, $4)
-       RETURNING deck_id, deck_name, description, is_public, created_at`,
-      [req.user.userId, deck_name.trim(), description || null, is_public || false]
+      `INSERT INTO decks (user_id, deck_name, description, is_public, total_cards, unique_cards, shuffle_behaviour, duplicate_handling)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING deck_id, deck_name, description, is_public, total_cards, unique_cards, shuffle_behaviour, duplicate_handling, created_at`,
+      [
+        req.user.userId,
+        deck_name.trim(),
+        description || null,
+        is_public || false,
+        total_cards || null,
+        unique_cards || null,
+        shuffle_behaviour || 'shuffle_before_game',
+        duplicate_handling || 'allow_duplicates',
+      ]
     );
 
     res.status(201).json(result.rows[0]);
@@ -115,7 +136,15 @@ const createDeck = async (req, res) => {
 const updateDeck = async (req, res) => {
   try {
     const { deck_id } = req.params;
-    const { deck_name, description, is_public } = req.body;
+    const {
+      deck_name,
+      description,
+      is_public,
+      total_cards,
+      unique_cards,
+      shuffle_behaviour,
+      duplicate_handling,
+    } = req.body;
 
     const deckResult = await db.query(
       'SELECT user_id FROM decks WHERE deck_id = $1',
@@ -155,6 +184,22 @@ const updateDeck = async (req, res) => {
       updates.push(`is_public = $${paramIndex++}`);
       values.push(is_public);
     }
+    if (total_cards !== undefined) {
+      updates.push(`total_cards = $${paramIndex++}`);
+      values.push(total_cards);
+    }
+    if (unique_cards !== undefined) {
+      updates.push(`unique_cards = $${paramIndex++}`);
+      values.push(unique_cards);
+    }
+    if (shuffle_behaviour !== undefined) {
+      updates.push(`shuffle_behaviour = $${paramIndex++}`);
+      values.push(shuffle_behaviour);
+    }
+    if (duplicate_handling !== undefined) {
+      updates.push(`duplicate_handling = $${paramIndex++}`);
+      values.push(duplicate_handling);
+    }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
@@ -165,7 +210,7 @@ const updateDeck = async (req, res) => {
 
     const result = await db.query(
       `UPDATE decks SET ${updates.join(', ')} WHERE deck_id = $${paramIndex}
-       RETURNING deck_id, user_id, deck_name, description, is_public, created_at, updated_at`,
+       RETURNING deck_id, user_id, deck_name, description, is_public, total_cards, unique_cards, shuffle_behaviour, duplicate_handling, created_at, updated_at`,
       values
     );
 

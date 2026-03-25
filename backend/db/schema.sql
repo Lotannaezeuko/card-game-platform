@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS games (
   game_code VARCHAR(10) UNIQUE,
   status game_status DEFAULT 'lobby',
   starting_hand_size INTEGER DEFAULT 5,
-  turn_direction VARCHAR(10) DEFAULT 'clockwise',
+  turn_direction VARCHAR(20) DEFAULT 'clockwise',
   deal_method VARCHAR(50) DEFAULT 'full_hand_at_start',
   current_player_position INTEGER DEFAULT 0,
   game_state JSONB DEFAULT '{}',

@@ -175,6 +175,22 @@ const passTurn = async (req, res) => {
 
     const { current_player_position, turn_direction } = gameResult.rows[0];
 
+    const playerResult = await db.query(
+      'SELECT player_position FROM game_players WHERE game_id = $1 AND user_id = $2',
+      [game_id, req.user.userId]
+    );
+
+    if (playerResult.rows.length === 0) {
+      return res.status(403).json({ error: 'Access denied. You are not a player in this game.' });
+    }
+
+    const callerPosition = playerResult.rows[0].player_position;
+    const effectivePosition = current_player_position === 0 ? 1 : current_player_position;
+
+    if (callerPosition !== effectivePosition) {
+      return res.status(403).json({ error: 'It is not your turn.' });
+    }
+
     const countResult = await db.query(
       'SELECT COUNT(*) AS player_count FROM game_players WHERE game_id = $1',
       [game_id]

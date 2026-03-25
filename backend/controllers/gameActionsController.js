@@ -82,7 +82,7 @@ const dealStartingHand = async (req, res) => {
   }
 };
 
-const drawCard = async (req, res) => {
+const getPlayerHand = async (req, res) => {
   try {
     const { game_id } = req.params;
 
@@ -93,6 +93,49 @@ const drawCard = async (req, res) => {
 
     if (playerCheck.rows.length === 0) {
       return res.status(403).json({ error: 'Access denied. You are not a player in this game.' });
+    }
+
+    const handResult = await db.query(
+      `SELECT ph.hand_id, ph.card_id, ph.acquired_at,
+              c.card_name, c.front_text, c.front_image_url,
+              c.back_text, c.back_image_url, c.is_unique, c.attributes
+       FROM player_hands ph
+       JOIN cards c ON c.card_id = ph.card_id
+       WHERE ph.game_id = $1 AND ph.user_id = $2
+       ORDER BY ph.acquired_at ASC`,
+      [game_id, req.user.userId]
+    );
+
+    res.json({ hand: handResult.rows });
+  } catch (error) {
+    console.error('Get player hand error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const drawCard = async (req, res) => {
+  try {
+    const { game_id } = req.params;
+
+    const playerResult = await db.query(
+      'SELECT player_position FROM game_players WHERE game_id = $1 AND user_id = $2',
+      [game_id, req.user.userId]
+    );
+
+    if (playerResult.rows.length === 0) {
+      return res.status(403).json({ error: 'Access denied. You are not a player in this game.' });
+    }
+
+    const gameResult = await db.query(
+      'SELECT current_player_position FROM games WHERE game_id = $1',
+      [game_id]
+    );
+
+    const { current_player_position } = gameResult.rows[0];
+    const effectivePosition = current_player_position === 0 ? 1 : current_player_position;
+
+    if (playerResult.rows[0].player_position !== effectivePosition) {
+      return res.status(403).json({ error: 'It is not your turn.' });
     }
 
     const drawResult = await db.query(
@@ -130,6 +173,27 @@ const playCard = async (req, res) => {
 
     if (!hand_id) {
       return res.status(400).json({ error: 'hand_id is required' });
+    }
+
+    const playerResult = await db.query(
+      'SELECT player_position FROM game_players WHERE game_id = $1 AND user_id = $2',
+      [game_id, req.user.userId]
+    );
+
+    if (playerResult.rows.length === 0) {
+      return res.status(403).json({ error: 'Access denied. You are not a player in this game.' });
+    }
+
+    const gameResult = await db.query(
+      'SELECT current_player_position FROM games WHERE game_id = $1',
+      [game_id]
+    );
+
+    const { current_player_position } = gameResult.rows[0];
+    const effectivePosition = current_player_position === 0 ? 1 : current_player_position;
+
+    if (playerResult.rows[0].player_position !== effectivePosition) {
+      return res.status(403).json({ error: 'It is not your turn.' });
     }
 
     const handResult = await db.query(
@@ -225,6 +289,19 @@ const reshuffleDeck = async (req, res) => {
   try {
     const { game_id } = req.params;
 
+    const hostCheck = await db.query(
+      'SELECT host_user_id FROM games WHERE game_id = $1',
+      [game_id]
+    );
+
+    if (hostCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    if (hostCheck.rows[0].host_user_id !== req.user.userId) {
+      return res.status(403).json({ error: 'Access denied. Only the host can reshuffle.' });
+    }
+
     const discardResult = await db.query(
       'SELECT card_id FROM session_discard_pile WHERE game_id = $1',
       [game_id]
@@ -271,6 +348,19 @@ const updateScore = async (req, res) => {
       return res.status(400).json({ error: 'user_id and score are required' });
     }
 
+    const hostCheck = await db.query(
+      'SELECT host_user_id FROM games WHERE game_id = $1',
+      [game_id]
+    );
+
+    if (hostCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    if (hostCheck.rows[0].host_user_id !== req.user.userId) {
+      return res.status(403).json({ error: 'Access denied. Only the host can update scores.' });
+    }
+
     const result = await db.query(
       `UPDATE game_players SET score = $1
        WHERE game_id = $2 AND user_id = $3
@@ -285,6 +375,51 @@ const updateScore = async (req, res) => {
     res.json({ player: result.rows[0] });
   } catch (error) {
     console.error('Update score error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const getFinalScores = async (req, res) => {
+  try {
+    const { game_id } = req.params;
+
+    const gameResult = await db.query(
+      'SELECT game_id, status, ended_at, host_user_id FROM games WHERE game_id = $1',
+      [game_id]
+    );
+
+    if (gameResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    const playerCheck = await db.query(
+      'SELECT game_player_id FROM game_players WHERE game_id = $1 AND user_id = $2',
+      [game_id, req.user.userId]
+    );
+
+    const isHost = gameResult.rows[0].host_user_id === req.user.userId;
+    if (playerCheck.rows.length === 0 && !isHost) {
+      return res.status(403).json({ error: 'Access denied. You are not a participant in this game.' });
+    }
+
+    const scoresResult = await db.query(
+      `SELECT gp.game_player_id, gp.user_id, gp.player_position, gp.score,
+              u.username
+       FROM game_players gp
+       JOIN users u ON u.user_id = gp.user_id
+       WHERE gp.game_id = $1
+       ORDER BY gp.score DESC, gp.player_position ASC`,
+      [game_id]
+    );
+
+    res.json({
+      game_id: gameResult.rows[0].game_id,
+      status: gameResult.rows[0].status,
+      ended_at: gameResult.rows[0].ended_at,
+      scores: scoresResult.rows,
+    });
+  } catch (error) {
+    console.error('Get final scores error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -323,11 +458,13 @@ const endSession = async (req, res) => {
 };
 
 module.exports = {
+  getPlayerHand,
   dealStartingHand,
   drawCard,
   playCard,
   passTurn,
   reshuffleDeck,
   updateScore,
+  getFinalScores,
   endSession,
 };

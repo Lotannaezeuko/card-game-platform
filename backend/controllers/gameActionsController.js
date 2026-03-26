@@ -1,4 +1,13 @@
 const db = require('../db');
+const {
+  emitGameStarted,
+  emitCardDrawn,
+  emitCardPlayed,
+  emitTurnPassed,
+  emitReshuffle,
+  emitScoreUpdated,
+  emitGameEnded,
+} = require('../socket/handlers/gameplay');
 
 const shuffle = (array) => {
   for (let i = array.length - 1; i > 0; i--) {
@@ -13,7 +22,7 @@ const dealStartingHand = async (req, res) => {
     const { game_id } = req.params;
 
     const gameResult = await db.query(
-      'SELECT deck_id, starting_hand_size, status, host_user_id FROM games WHERE game_id = $1',
+      'SELECT deck_id, starting_hand_size, status, host_user_id, game_code FROM games WHERE game_id = $1',
       [game_id]
     );
 
@@ -76,6 +85,11 @@ const dealStartingHand = async (req, res) => {
     );
 
     res.json({ message: 'Starting hand dealt successfully' });
+
+    emitGameStarted(req.app.get('io'), game.game_code, {
+      starting_hand_size: game.starting_hand_size,
+      player_count: players.length,
+    });
   } catch (error) {
     console.error('Deal starting hand error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -127,11 +141,11 @@ const drawCard = async (req, res) => {
     }
 
     const gameResult = await db.query(
-      'SELECT current_player_position FROM games WHERE game_id = $1',
+      'SELECT current_player_position, game_code FROM games WHERE game_id = $1',
       [game_id]
     );
 
-    const { current_player_position } = gameResult.rows[0];
+    const { current_player_position, game_code } = gameResult.rows[0];
     const effectivePosition = current_player_position === 0 ? 1 : current_player_position;
 
     if (playerResult.rows[0].player_position !== effectivePosition) {
@@ -160,6 +174,11 @@ const drawCard = async (req, res) => {
     );
 
     res.status(201).json({ hand_entry: handResult.rows[0] });
+
+    emitCardDrawn(req.app.get('io'), game_code, {
+      user_id: req.user.userId,
+      username: req.user.username,
+    });
   } catch (error) {
     console.error('Draw card error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -185,11 +204,11 @@ const playCard = async (req, res) => {
     }
 
     const gameResult = await db.query(
-      'SELECT current_player_position FROM games WHERE game_id = $1',
+      'SELECT current_player_position, game_code FROM games WHERE game_id = $1',
       [game_id]
     );
 
-    const { current_player_position } = gameResult.rows[0];
+    const { current_player_position, game_code } = gameResult.rows[0];
     const effectivePosition = current_player_position === 0 ? 1 : current_player_position;
 
     if (playerResult.rows[0].player_position !== effectivePosition) {
@@ -197,7 +216,10 @@ const playCard = async (req, res) => {
     }
 
     const handResult = await db.query(
-      'SELECT card_id FROM player_hands WHERE hand_id = $1 AND game_id = $2 AND user_id = $3',
+      `SELECT ph.card_id, c.card_name, c.front_text, c.front_image_url, c.attributes
+       FROM player_hands ph
+       JOIN cards c ON c.card_id = ph.card_id
+       WHERE ph.hand_id = $1 AND ph.game_id = $2 AND ph.user_id = $3`,
       [hand_id, game_id, req.user.userId]
     );
 
@@ -205,7 +227,7 @@ const playCard = async (req, res) => {
       return res.status(404).json({ error: 'Card not found in your hand' });
     }
 
-    const { card_id } = handResult.rows[0];
+    const { card_id, card_name, front_text, front_image_url, attributes } = handResult.rows[0];
 
     await db.query(
       'DELETE FROM player_hands WHERE hand_id = $1',
@@ -218,6 +240,12 @@ const playCard = async (req, res) => {
     );
 
     res.json({ discard_entry: discardResult.rows[0] });
+
+    emitCardPlayed(req.app.get('io'), game_code, {
+      user_id: req.user.userId,
+      username: req.user.username,
+      card: { card_id, card_name, front_text, front_image_url, attributes },
+    });
   } catch (error) {
     console.error('Play card error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -229,7 +257,7 @@ const passTurn = async (req, res) => {
     const { game_id } = req.params;
 
     const gameResult = await db.query(
-      'SELECT current_player_position, turn_direction FROM games WHERE game_id = $1',
+      'SELECT current_player_position, turn_direction, game_code FROM games WHERE game_id = $1',
       [game_id]
     );
 
@@ -237,7 +265,7 @@ const passTurn = async (req, res) => {
       return res.status(404).json({ error: 'Game not found' });
     }
 
-    const { current_player_position, turn_direction } = gameResult.rows[0];
+    const { current_player_position, turn_direction, game_code } = gameResult.rows[0];
 
     const playerResult = await db.query(
       'SELECT player_position FROM game_players WHERE game_id = $1 AND user_id = $2',
@@ -279,6 +307,11 @@ const passTurn = async (req, res) => {
     );
 
     res.json({ game: updateResult.rows[0] });
+
+    emitTurnPassed(req.app.get('io'), game_code, {
+      current_player_position: nextPosition,
+      turn_direction,
+    });
   } catch (error) {
     console.error('Pass turn error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -290,7 +323,7 @@ const reshuffleDeck = async (req, res) => {
     const { game_id } = req.params;
 
     const hostCheck = await db.query(
-      'SELECT host_user_id FROM games WHERE game_id = $1',
+      'SELECT host_user_id, game_code FROM games WHERE game_id = $1',
       [game_id]
     );
 
@@ -301,6 +334,8 @@ const reshuffleDeck = async (req, res) => {
     if (hostCheck.rows[0].host_user_id !== req.user.userId) {
       return res.status(403).json({ error: 'Access denied. Only the host can reshuffle.' });
     }
+
+    const { game_code } = hostCheck.rows[0];
 
     const discardResult = await db.query(
       'SELECT card_id FROM session_discard_pile WHERE game_id = $1',
@@ -333,6 +368,8 @@ const reshuffleDeck = async (req, res) => {
     }
 
     res.json({ message: 'Discard pile reshuffled into draw pile', count: cardIds.length });
+
+    emitReshuffle(req.app.get('io'), game_code, { count: cardIds.length });
   } catch (error) {
     console.error('Reshuffle deck error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -349,7 +386,7 @@ const updateScore = async (req, res) => {
     }
 
     const hostCheck = await db.query(
-      'SELECT host_user_id FROM games WHERE game_id = $1',
+      'SELECT host_user_id, game_code FROM games WHERE game_id = $1',
       [game_id]
     );
 
@@ -372,7 +409,18 @@ const updateScore = async (req, res) => {
       return res.status(404).json({ error: 'Player not found in this game' });
     }
 
+    const usernameResult = await db.query(
+      'SELECT username FROM users WHERE user_id = $1',
+      [user_id]
+    );
+
     res.json({ player: result.rows[0] });
+
+    emitScoreUpdated(req.app.get('io'), hostCheck.rows[0].game_code, {
+      user_id,
+      username: usernameResult.rows[0]?.username,
+      score,
+    });
   } catch (error) {
     console.error('Update score error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -429,7 +477,7 @@ const endSession = async (req, res) => {
     const { game_id } = req.params;
 
     const gameResult = await db.query(
-      'SELECT host_user_id, status FROM games WHERE game_id = $1',
+      'SELECT host_user_id, status, game_code FROM games WHERE game_id = $1',
       [game_id]
     );
 
@@ -450,7 +498,21 @@ const endSession = async (req, res) => {
       [game_id]
     );
 
+    const scoresResult = await db.query(
+      `SELECT gp.user_id, gp.player_position, gp.score, u.username
+       FROM game_players gp
+       JOIN users u ON u.user_id = gp.user_id
+       WHERE gp.game_id = $1
+       ORDER BY gp.score DESC`,
+      [game_id]
+    );
+
     res.json({ message: 'Game session ended', game: result.rows[0] });
+
+    emitGameEnded(req.app.get('io'), gameResult.rows[0].game_code, {
+      ended_at: result.rows[0].ended_at,
+      scores: scoresResult.rows,
+    });
   } catch (error) {
     console.error('End session error:', error);
     res.status(500).json({ error: 'Internal server error' });

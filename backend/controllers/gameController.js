@@ -1,4 +1,5 @@
 const db = require('../db');
+const { emitPlayerJoined, emitPlayerLeft } = require('../socket/handlers/gameplay');
 
 const generateGameCode = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -225,7 +226,7 @@ const addPlayerToGame = async (req, res) => {
     const { user_id } = req.body;
 
     const gameResult = await db.query(
-      'SELECT ended_at FROM games WHERE game_id = $1',
+      'SELECT ended_at, game_code FROM games WHERE game_id = $1',
       [game_id]
     );
 
@@ -236,6 +237,8 @@ const addPlayerToGame = async (req, res) => {
     if (gameResult.rows[0].ended_at !== null) {
       return res.status(400).json({ error: 'Game has already ended' });
     }
+
+    const { game_code } = gameResult.rows[0];
 
     if (user_id) {
       const existingPlayer = await db.query(
@@ -263,6 +266,15 @@ const addPlayerToGame = async (req, res) => {
     );
 
     res.status(201).json({ player: result.rows[0], message: 'Player added to game' });
+
+    if (user_id) {
+      const userResult = await db.query('SELECT username FROM users WHERE user_id = $1', [user_id]);
+      emitPlayerJoined(req.app.get('io'), game_code, {
+        user_id,
+        username: userResult.rows[0]?.username,
+        player_position: nextPosition,
+      });
+    }
   } catch (error) {
     console.error('Add player to game error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -274,9 +286,10 @@ const removePlayerFromGame = async (req, res) => {
     const { game_id, game_player_id } = req.params;
 
     const result = await db.query(
-      `SELECT gp.*, g.host_user_id
+      `SELECT gp.*, g.host_user_id, g.game_code, u.username
        FROM game_players gp
        JOIN games g ON gp.game_id = g.game_id
+       LEFT JOIN users u ON u.user_id = gp.user_id
        WHERE gp.game_player_id = $1 AND gp.game_id = $2`,
       [game_player_id, game_id]
     );
@@ -299,6 +312,11 @@ const removePlayerFromGame = async (req, res) => {
     );
 
     res.json({ message: 'Player removed from game' });
+
+    emitPlayerLeft(req.app.get('io'), record.game_code, {
+      user_id: record.user_id,
+      username: record.username,
+    });
   } catch (error) {
     console.error('Remove player from game error:', error);
     res.status(500).json({ error: 'Internal server error' });

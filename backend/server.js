@@ -1,7 +1,10 @@
 require('dotenv').config();
 
+const http = require('http');
 const express = require('express');
 const cors = require('cors');
+const { Server } = require('socket.io');
+const initSocket = require('./socket');
 
 const authRoutes = require('./routes/auth');
 const deckRoutes = require('./routes/decks');
@@ -9,7 +12,20 @@ const cardRoutes = require('./routes/cards');
 const gameRoutes = require('./routes/games');
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
+
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    credentials: true,
+  },
+});
+
+// Make io accessible in controllers via req.app.get('io')
+app.set('io', io);
+
+initSocket(io);
 
 // Middleware
 app.use(cors({
@@ -40,6 +56,6 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

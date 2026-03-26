@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Socket.IO Test — Card Game Platform</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: monospace;
+      background: #0d0d0d;
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 12px;
+      gap: 10px;
+    }
+
+    h2 {
+      color: #7dd3fc;
+      font-size: 14px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .top {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    label { font-size: 11px; color: #9ca3af; }
+
+    input {
+      background: #1f2937;
+      border: 1px solid #374151;
+      color: #e0e0e0;
+      padding: 6px 10px;
+      font-family: monospace;
+      font-size: 13px;
+      border-radius: 4px;
+      outline: none;
+    }
+
+    input:focus { border-color: #7dd3fc; }
+    input#token { width: 420px; }
+    input#user-label { width: 120px; }
+    input#game-code { width: 100px; }
+
+    button {
+      padding: 6px 14px;
+      font-family: monospace;
+      font-size: 13px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    #btn-connect    { background: #16a34a; color: #fff; }
+    #btn-disconnect { background: #dc2626; color: #fff; display: none; }
+    #btn-join       { background: #2563eb; color: #fff; }
+    #btn-clear      { background: #374151; color: #e0e0e0; }
+
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .status {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      align-self: flex-end;
+    }
+    .status.offline { background: #374151; color: #9ca3af; }
+    .status.online  { background: #14532d; color: #4ade80; }
+
+    .panels {
+      display: flex;
+      gap: 10px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    pre {
+      flex: 1;
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 10px;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .entry { margin-bottom: 8px; }
+    .entry .ts  { color: #6b7280; }
+    .entry .tag { font-weight: bold; margin: 0 4px; }
+
+    .tag.connected        { color: #4ade80; }
+    .tag.disconnected     { color: #f87171; }
+    .tag.joined_game      { color: #7dd3fc; }
+    .tag.player_connected { color: #a78bfa; }
+    .tag.player_disconnected { color: #f87171; }
+    .tag.player_joined    { color: #a78bfa; }
+    .tag.player_left      { color: #f87171; }
+    .tag.game_started     { color: #facc15; }
+    .tag.card_drawn       { color: #34d399; }
+    .tag.card_played      { color: #f97316; }
+    .tag.turn_passed      { color: #818cf8; }
+    .tag.deck_reshuffled  { color: #fb7185; }
+    .tag.score_updated    { color: #facc15; }
+    .tag.game_ended       { color: #f43f5e; }
+    .tag.error            { color: #ef4444; }
+    .tag.emit             { color: #9ca3af; }
+
+    .payload { color: #d1d5db; margin-left: 16px; }
+  </style>
+</head>
+<body>
+
+  <h2>Socket.IO Test — Card Game Platform</h2>
+
+  <div class="top">
+    <div class="field">
+      <label>LABEL (your name for this tab)</label>
+      <input id="user-label" value="User 1" />
+    </div>
+    <div class="field">
+      <label>JWT TOKEN</label>
+      <input id="token" placeholder="Paste JWT from login response" />
+    </div>
+    <div class="field">
+      <label>GAME CODE</label>
+      <input id="game-code" value="XK92F" />
+    </div>
+    <button id="btn-connect" onclick="connect()">Connect</button>
+    <button id="btn-disconnect" onclick="disconnect()">Disconnect</button>
+    <button id="btn-join" onclick="joinGame()" disabled>Join Game</button>
+    <button id="btn-clear" onclick="clearLog()">Clear</button>
+    <span class="status offline" id="status">● Offline</span>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <h2>Event Log</h2>
+      <pre id="log"></pre>
+    </div>
+  </div>
+
+  <script src="http://localhost:3001/socket.io/socket.io.js"></script>
+  <script>
+    let socket = null;
+
+    const events = [
+      'joined_game',
+      'player_connected',
+      'player_disconnected',
+      'player_joined',
+      'player_left',
+      'game_started',
+      'card_drawn',
+      'card_played',
+      'turn_passed',
+      'deck_reshuffled',
+      'score_updated',
+      'game_ended',
+      'error',
+    ];
+
+    function log(tag, data) {
+      const pre = document.getElementById('log');
+      const label = document.getElementById('user-label').value || 'Tab';
+      const ts = new Date().toLocaleTimeString('en-GB', { hour12: false });
+      const payload = data && Object.keys(data).length
+        ? '\n' + JSON.stringify(data, null, 2)
+        : '';
+      const tagClass = tag.replace(/\s/g, '_').toLowerCase();
+      pre.innerHTML +=
+        `<div class="entry">` +
+        `<span class="ts">[${ts}] [${label}]</span>` +
+        `<span class="tag ${tagClass}"> ${tag.toUpperCase()} </span>` +
+        (payload ? `<span class="payload">${escapeHtml(payload)}</span>` : '') +
+        `</div>`;
+      pre.scrollTop = pre.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function connect() {
+      const token = document.getElementById('token').value.trim();
+      if (!token) { alert('Paste your JWT token first.'); return; }
+
+      socket = io('http://localhost:3001', {
+        auth: { token },
+        transports: ['websocket'],
+      });
+
+      socket.on('connect', () => {
+        log('connected', { socket_id: socket.id });
+        document.getElementById('status').className = 'status online';
+        document.getElementById('status').textContent = '● Online';
+        document.getElementById('btn-connect').style.display = 'none';
+        document.getElementById('btn-disconnect').style.display = '';
+        document.getElementById('btn-join').disabled = false;
+      });
+
+      socket.on('connect_error', (e) => {
+        log('error', { message: e.message });
+      });
+
+      socket.on('disconnect', (reason) => {
+        log('disconnected', { reason });
+        document.getElementById('status').className = 'status offline';
+        document.getElementById('status').textContent = '● Offline';
+        document.getElementById('btn-connect').style.display = '';
+        document.getElementById('btn-disconnect').style.display = 'none';
+        document.getElementById('btn-join').disabled = true;
+      });
+
+      events.forEach((event) => {
+        socket.on(event, (data) => log(event, data));
+      });
+    }
+
+    function disconnect() {
+      if (socket) socket.disconnect();
+    }
+
+    function joinGame() {
+      const code = document.getElementById('game-code').value.trim();
+      if (!code) { alert('Enter a game code.'); return; }
+      log('emit', { event: 'join_game', game_code: code });
+      socket.emit('join_game', { game_code: code });
+    }
+
+    function clearLog() {
+      document.getElementById('log').innerHTML = '';
+    }
+  </script>
+
+</body>
+</html>
+```

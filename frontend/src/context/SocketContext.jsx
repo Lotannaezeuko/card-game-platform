@@ -19,7 +19,7 @@ export function SocketProvider({ children }) {
       return;
     }
 
-    const s = io('http://localhost:3001', {
+    const s = io(`http://${window.location.hostname}:3001`, {
       auth: { token },
     });
 

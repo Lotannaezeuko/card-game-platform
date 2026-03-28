@@ -17,7 +17,14 @@ const PORT = process.env.PORT || 3001;
 
 const allowedOrigins = process.env.FRONTEND_URL
   ? [process.env.FRONTEND_URL]
-  : ['http://localhost:3000', 'http://localhost:5173'];
+  : (origin, callback) => {
+      // In dev, allow localhost and local network origins
+      if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    };
 
 const io = new Server(server, {
   cors: {

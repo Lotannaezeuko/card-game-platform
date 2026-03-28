@@ -1,5 +1,5 @@
 const db = require('../db');
-const { emitPlayerJoined, emitPlayerLeft } = require('../socket/handlers/gameplay');
+const { emitPlayerJoined, emitPlayerLeft, emitTurnPassed } = require('../socket/handlers/gameplay');
 
 const generateGameCode = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -8,6 +8,68 @@ const generateGameCode = () => {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
   return code;
+};
+
+const joinByCode = async (req, res) => {
+  try {
+    const { game_code } = req.body;
+
+    if (!game_code) {
+      return res.status(400).json({ error: 'game_code is required' });
+    }
+
+    const gameResult = await db.query(
+      `SELECT g.*, d.deck_name, u.username AS host_username
+       FROM games g
+       LEFT JOIN decks d ON g.deck_id = d.deck_id
+       LEFT JOIN users u ON g.host_user_id = u.user_id
+       WHERE g.game_code = $1`,
+      [game_code.toUpperCase()]
+    );
+
+    if (gameResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    const game = gameResult.rows[0];
+
+    if (game.status === 'ended') {
+      return res.status(400).json({ error: 'This game has already ended' });
+    }
+
+    const existingPlayer = await db.query(
+      'SELECT * FROM game_players WHERE game_id = $1 AND user_id = $2',
+      [game.game_id, req.user.userId]
+    );
+
+    if (existingPlayer.rows.length > 0) {
+      // Already in the game — just return the game so they can navigate to lobby
+      return res.json({ game, message: 'Already in game' });
+    }
+
+    const positionResult = await db.query(
+      'SELECT COALESCE(MAX(player_position), 0) + 1 AS next_position FROM game_players WHERE game_id = $1',
+      [game.game_id]
+    );
+
+    const nextPosition = positionResult.rows[0].next_position;
+
+    await db.query(
+      'INSERT INTO game_players (game_id, user_id, player_position, score) VALUES ($1, $2, $3, 0)',
+      [game.game_id, req.user.userId, nextPosition]
+    );
+
+    res.status(201).json({ game, message: 'Joined game successfully' });
+
+    emitPlayerJoined(req.app.get('io'), game.game_code, {
+      user_id: req.user.userId,
+      username: req.user.username,
+      player_position: nextPosition,
+    });
+  } catch (error) {
+    console.error('Join by code error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 };
 
 const getAllGames = async (req, res) => {
@@ -323,6 +385,56 @@ const removePlayerFromGame = async (req, res) => {
   }
 };
 
+const adjustTurn = async (req, res) => {
+  try {
+    const { game_id } = req.params;
+    const { player_position } = req.body;
+
+    if (!player_position) {
+      return res.status(400).json({ error: 'player_position is required' });
+    }
+
+    const hostCheck = await db.query(
+      'SELECT host_user_id, game_code, turn_direction FROM games WHERE game_id = $1',
+      [game_id]
+    );
+
+    if (hostCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    if (hostCheck.rows[0].host_user_id !== req.user.userId) {
+      return res.status(403).json({ error: 'Only the host can adjust the turn' });
+    }
+
+    const playerCheck = await db.query(
+      'SELECT player_position FROM game_players WHERE game_id = $1 AND player_position = $2',
+      [game_id, player_position]
+    );
+
+    if (playerCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'No player at that position' });
+    }
+
+    const { game_code, turn_direction } = hostCheck.rows[0];
+
+    await db.query(
+      'UPDATE games SET current_player_position = $1 WHERE game_id = $2',
+      [player_position, game_id]
+    );
+
+    res.json({ message: 'Turn adjusted' });
+
+    emitTurnPassed(req.app.get('io'), game_code, {
+      current_player_position: player_position,
+      turn_direction,
+    });
+  } catch (error) {
+    console.error('Adjust turn error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   getAllGames,
   getGameById,
@@ -331,4 +443,6 @@ module.exports = {
   endGame,
   addPlayerToGame,
   removePlayerFromGame,
+  joinByCode,
+  adjustTurn,
 };

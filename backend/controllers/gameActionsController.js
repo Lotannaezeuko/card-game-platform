@@ -296,9 +296,9 @@ const passTurn = async (req, res) => {
 
     let nextPosition;
     if (turn_direction === 'counterclockwise') {
-      nextPosition = ((current_player_position - 2 + playerCount) % playerCount) + 1;
+      nextPosition = ((effectivePosition - 2 + playerCount) % playerCount) + 1;
     } else {
-      nextPosition = (current_player_position % playerCount) + 1;
+      nextPosition = (effectivePosition % playerCount) + 1;
     }
 
     const updateResult = await db.query(

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { SocketProvider } from './context/SocketContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import LoginPage from './pages/LoginPage';
@@ -9,6 +10,10 @@ import CardsPage from './pages/CardsPage';
 import CardBuilderPage from './pages/CardBuilderPage';
 import DecksPage from './pages/DecksPage';
 import DeckBuilderPage from './pages/DeckBuilderPage';
+import GameSetupPage from './pages/GameSetupPage';
+import LobbyPage from './pages/LobbyPage';
+import GamePage from './pages/GamePage';
+import EndSessionPage from './pages/EndSessionPage';
 
 // Placeholder pages — to be built in later phases
 const Placeholder = ({ name }) => (
@@ -18,6 +23,7 @@ const Placeholder = ({ name }) => (
 export default function App() {
   return (
     <AuthProvider>
+      <SocketProvider>
       <BrowserRouter>
         <Routes>
           {/* Public */}
@@ -33,12 +39,13 @@ export default function App() {
           <Route path="/decks" element={<ProtectedRoute><DecksPage /></ProtectedRoute>} />
           <Route path="/decks/new" element={<ProtectedRoute><DeckBuilderPage /></ProtectedRoute>} />
           <Route path="/decks/:deckId/edit" element={<ProtectedRoute><DeckBuilderPage /></ProtectedRoute>} />
-          <Route path="/games/setup" element={<ProtectedRoute><Placeholder name="Game Setup" /></ProtectedRoute>} />
-          <Route path="/games/:gameId/lobby" element={<ProtectedRoute><Placeholder name="Lobby" /></ProtectedRoute>} />
-          <Route path="/games/:gameId/play" element={<ProtectedRoute><Placeholder name="Game" /></ProtectedRoute>} />
-          <Route path="/games/:gameId/end" element={<ProtectedRoute><Placeholder name="End Session" /></ProtectedRoute>} />
+          <Route path="/games/setup" element={<ProtectedRoute><GameSetupPage /></ProtectedRoute>} />
+          <Route path="/games/:gameId/lobby" element={<ProtectedRoute><LobbyPage /></ProtectedRoute>} />
+          <Route path="/games/:gameId/play" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
+          <Route path="/games/:gameId/end" element={<ProtectedRoute><EndSessionPage /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
+      </SocketProvider>
     </AuthProvider>
   );
 }

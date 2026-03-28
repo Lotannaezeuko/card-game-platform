@@ -136,7 +136,19 @@ const getGameById = async (req, res) => {
       return res.status(403).json({ error: 'Access denied. You are not a participant in this game.' });
     }
 
-    res.json({ game, players: playerResult.rows });
+    const discardResult = await db.query(
+      `SELECT c.card_id, c.card_name, c.front_text, c.front_image_url, c.attributes
+       FROM session_discard_pile sdp
+       JOIN cards c ON c.card_id = sdp.card_id
+       WHERE sdp.game_id = $1
+       ORDER BY sdp.discarded_at DESC
+       LIMIT 1`,
+      [game_id]
+    );
+
+    const discard_top = discardResult.rows.length > 0 ? discardResult.rows[0] : null;
+
+    res.json({ game, players: playerResult.rows, discard_top });
   } catch (error) {
     console.error('Get game by id error:', error);
     res.status(500).json({ error: 'Internal server error' });

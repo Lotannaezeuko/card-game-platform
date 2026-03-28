@@ -83,7 +83,10 @@ export default function LobbyPage() {
     });
 
     socket.on('game_started', () => {
-      navigateRef.current(`/games/${gameId}/play`, { replace: true });
+      navigateRef.current(`/games/${gameId}/play`, {
+        replace: true,
+        state: { game_code: game.game_code },
+      });
     });
 
     // Show socket-level errors (e.g. join_game rejected)
@@ -108,7 +111,10 @@ export default function LobbyPage() {
     setStarting(true);
     try {
       await apiFetch(`/games/${gameId}/deal`, { method: 'POST' });
-      navigate(`/games/${gameId}/play`, { replace: true });
+      navigate(`/games/${gameId}/play`, {
+        replace: true,
+        state: { game_code: game.game_code },
+      });
     } catch (err) {
       setError(err.message || 'Failed to start game');
       setStarting(false);

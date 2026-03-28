@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { apiFetch } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -12,6 +12,7 @@ import ToastContainer, { useToasts } from '../components/ui/Toast';
 export default function GamePage() {
   const { gameId } = useParams();
   const navigate = useNavigate();
+  const { state: navState } = useLocation();
   const { user } = useAuth();
   const socket = useSocket();
 
@@ -42,6 +43,14 @@ export default function GamePage() {
   const currentPlayer = players.find((p) => p.player_position === effectivePos);
   const isMyTurn = currentPlayer?.user_id === user?.userId;
 
+  // Emit join_game immediately using game_code passed from LobbyPage —
+  // this eliminates the timing window between leave_game (LobbyPage cleanup)
+  // and the later join_game that fires after the API call below.
+  useEffect(() => {
+    if (!socket || !navState?.game_code) return;
+    socket.emit('join_game', { game_code: navState.game_code });
+  }, [socket, navState?.game_code]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Load game + hand on mount
   useEffect(() => {
     Promise.all([
@@ -54,6 +63,7 @@ export default function GamePage() {
         setIsHost(gameData.game.host_user_id === user?.userId);
         setCurrentPlayerPos(gameData.game.current_player_position ?? 1);
         setHand(handData.hand || []);
+        if (gameData.discard_top) setDiscardTop(gameData.discard_top);
       })
       .catch(() => addToast('Failed to load game'));
   }, [gameId, user]);

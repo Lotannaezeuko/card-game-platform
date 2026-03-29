@@ -19,8 +19,9 @@ export function SocketProvider({ children }) {
       return;
     }
 
+    const activeToken = sessionStorage.getItem('token') || localStorage.getItem('token') || token;
     const s = io(`http://${window.location.hostname}:3001`, {
-      auth: { token },
+      auth: { token: activeToken },
     });
 
     socketRef.current = s;

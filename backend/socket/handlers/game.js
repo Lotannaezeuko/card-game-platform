@@ -20,22 +20,36 @@ const registerGameHandlers = (io, socket) => {
 
       const { game_id, status } = gameResult.rows[0];
 
-      const playerCheck = await db.query(
-        'SELECT game_player_id, player_position FROM game_players WHERE game_id = $1 AND user_id = $2',
-        [game_id, socket.user.userId]
-      );
+      // For guests (userId is null), use IS NULL to match in SQL
+      const isGuest = socket.user.isGuest === true;
+      let playerCheck;
+
+      if (isGuest) {
+        playerCheck = await db.query(
+          'SELECT game_player_id, player_position FROM game_players WHERE game_id = $1 AND user_id IS NULL ORDER BY joined_at DESC LIMIT 1',
+          [game_id]
+        );
+      } else {
+        playerCheck = await db.query(
+          'SELECT game_player_id, player_position FROM game_players WHERE game_id = $1 AND user_id = $2',
+          [game_id, socket.user.userId]
+        );
+      }
 
       if (playerCheck.rows.length === 0) {
         return socket.emit('error', { message: 'You are not a participant in this game' });
       }
 
+      const gamePlayerId = playerCheck.rows[0].game_player_id;
+
       socket.join(game_code);
       socket.gameCode = game_code;
       socket.gameId = game_id;
+      socket.gamePlayerId = gamePlayerId;
 
       await db.query(
-        'UPDATE game_players SET is_connected = true WHERE game_id = $1 AND user_id = $2',
-        [game_id, socket.user.userId]
+        'UPDATE game_players SET is_connected = true WHERE game_player_id = $1',
+        [gamePlayerId]
       );
 
       socket.emit('joined_game', {
@@ -48,6 +62,7 @@ const registerGameHandlers = (io, socket) => {
       // Notify others in the room
       socket.to(game_code).emit('player_connected', {
         user_id: socket.user.userId,
+        game_player_id: gamePlayerId,
         username: socket.user.username,
       });
     } catch (err) {
@@ -62,35 +77,32 @@ const registerGameHandlers = (io, socket) => {
 
     socket.leave(game_code);
 
-    const gameResult = await db.query(
-      'SELECT game_id FROM games WHERE game_code = $1',
-      [game_code]
-    );
-
-    if (gameResult.rows.length > 0) {
+    if (socket.gamePlayerId) {
       await db.query(
-        'UPDATE game_players SET is_connected = false WHERE game_id = $1 AND user_id = $2',
-        [gameResult.rows[0].game_id, socket.user.userId]
+        'UPDATE game_players SET is_connected = false WHERE game_player_id = $1',
+        [socket.gamePlayerId]
       );
     }
 
     socket.to(game_code).emit('player_disconnected', {
       user_id: socket.user.userId,
+      game_player_id: socket.gamePlayerId,
       username: socket.user.username,
     });
   });
 
   // Handle disconnect — mark player as not connected in any active game they were in
   socket.on('disconnect', async () => {
-    if (!socket.gameCode || !socket.gameId) return;
+    if (!socket.gameCode || !socket.gamePlayerId) return;
 
     await db.query(
-      'UPDATE game_players SET is_connected = false WHERE game_id = $1 AND user_id = $2',
-      [socket.gameId, socket.user.userId]
+      'UPDATE game_players SET is_connected = false WHERE game_player_id = $1',
+      [socket.gamePlayerId]
     );
 
     socket.to(socket.gameCode).emit('player_disconnected', {
       user_id: socket.user.userId,
+      game_player_id: socket.gamePlayerId,
       username: socket.user.username,
     });
   });

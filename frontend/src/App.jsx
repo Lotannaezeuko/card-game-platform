@@ -5,6 +5,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import GuestJoinPage from './pages/GuestJoinPage';
 import HomePage from './pages/HomePage';
 import CardsPage from './pages/CardsPage';
 import CardBuilderPage from './pages/CardBuilderPage';
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/join" element={<GuestJoinPage />} />
 
           {/* Protected */}
           <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />

@@ -33,7 +33,7 @@ const dealStartingHand = async (req, res) => {
     const game = gameResult.rows[0];
 
     const playerCheck = await db.query(
-      'SELECT user_id FROM game_players WHERE game_id = $1 AND user_id = $2',
+      'SELECT user_id FROM game_players WHERE game_id = $1 AND user_id IS NOT DISTINCT FROM $2',
       [game_id, req.user.userId]
     );
 
@@ -101,7 +101,7 @@ const getPlayerHand = async (req, res) => {
     const { game_id } = req.params;
 
     const playerCheck = await db.query(
-      'SELECT game_player_id FROM game_players WHERE game_id = $1 AND user_id = $2',
+      'SELECT game_player_id FROM game_players WHERE game_id = $1 AND user_id IS NOT DISTINCT FROM $2',
       [game_id, req.user.userId]
     );
 
@@ -115,7 +115,7 @@ const getPlayerHand = async (req, res) => {
               c.back_text, c.back_image_url, c.is_unique, c.attributes
        FROM player_hands ph
        JOIN cards c ON c.card_id = ph.card_id
-       WHERE ph.game_id = $1 AND ph.user_id = $2
+       WHERE ph.game_id = $1 AND ph.user_id IS NOT DISTINCT FROM $2
        ORDER BY ph.acquired_at ASC`,
       [game_id, req.user.userId]
     );
@@ -132,7 +132,7 @@ const drawCard = async (req, res) => {
     const { game_id } = req.params;
 
     const playerResult = await db.query(
-      'SELECT player_position FROM game_players WHERE game_id = $1 AND user_id = $2',
+      'SELECT player_position FROM game_players WHERE game_id = $1 AND user_id IS NOT DISTINCT FROM $2',
       [game_id, req.user.userId]
     );
 
@@ -195,7 +195,7 @@ const playCard = async (req, res) => {
     }
 
     const playerResult = await db.query(
-      'SELECT player_position FROM game_players WHERE game_id = $1 AND user_id = $2',
+      'SELECT player_position FROM game_players WHERE game_id = $1 AND user_id IS NOT DISTINCT FROM $2',
       [game_id, req.user.userId]
     );
 
@@ -219,7 +219,7 @@ const playCard = async (req, res) => {
       `SELECT ph.card_id, c.card_name, c.front_text, c.front_image_url, c.attributes
        FROM player_hands ph
        JOIN cards c ON c.card_id = ph.card_id
-       WHERE ph.hand_id = $1 AND ph.game_id = $2 AND ph.user_id = $3`,
+       WHERE ph.hand_id = $1 AND ph.game_id = $2 AND ph.user_id IS NOT DISTINCT FROM $3`,
       [hand_id, game_id, req.user.userId]
     );
 
@@ -268,7 +268,7 @@ const passTurn = async (req, res) => {
     const { current_player_position, turn_direction, game_code } = gameResult.rows[0];
 
     const playerResult = await db.query(
-      'SELECT player_position FROM game_players WHERE game_id = $1 AND user_id = $2',
+      'SELECT player_position FROM game_players WHERE game_id = $1 AND user_id IS NOT DISTINCT FROM $2',
       [game_id, req.user.userId]
     );
 
@@ -400,7 +400,7 @@ const updateScore = async (req, res) => {
 
     const result = await db.query(
       `UPDATE game_players SET score = $1
-       WHERE game_id = $2 AND user_id = $3
+       WHERE game_id = $2 AND user_id IS NOT DISTINCT FROM $3
        RETURNING *`,
       [score, game_id, user_id]
     );
@@ -441,7 +441,7 @@ const getFinalScores = async (req, res) => {
     }
 
     const playerCheck = await db.query(
-      'SELECT game_player_id FROM game_players WHERE game_id = $1 AND user_id = $2',
+      'SELECT game_player_id FROM game_players WHERE game_id = $1 AND user_id IS NOT DISTINCT FROM $2',
       [game_id, req.user.userId]
     );
 
@@ -454,7 +454,7 @@ const getFinalScores = async (req, res) => {
       `SELECT gp.game_player_id, gp.user_id, gp.player_position, gp.score,
               u.username
        FROM game_players gp
-       JOIN users u ON u.user_id = gp.user_id
+       LEFT JOIN users u ON u.user_id = gp.user_id
        WHERE gp.game_id = $1
        ORDER BY gp.score DESC, gp.player_position ASC`,
       [game_id]
@@ -501,7 +501,7 @@ const endSession = async (req, res) => {
     const scoresResult = await db.query(
       `SELECT gp.user_id, gp.player_position, gp.score, u.username
        FROM game_players gp
-       JOIN users u ON u.user_id = gp.user_id
+       LEFT JOIN users u ON u.user_id = gp.user_id
        WHERE gp.game_id = $1
        ORDER BY gp.score DESC`,
       [game_id]

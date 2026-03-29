@@ -38,7 +38,7 @@ const joinByCode = async (req, res) => {
     }
 
     const existingPlayer = await db.query(
-      'SELECT * FROM game_players WHERE game_id = $1 AND user_id = $2',
+      'SELECT * FROM game_players WHERE game_id = $1 AND user_id IS NOT DISTINCT FROM $2',
       [game.game_id, req.user.userId]
     );
 
@@ -130,7 +130,11 @@ const getGameById = async (req, res) => {
     );
 
     const isHost = game.host_user_id === req.user.userId;
-    const isPlayer = playerResult.rows.some((p) => p.user_id === req.user.userId);
+    const isGuest = req.user.isGuest === true;
+    // In JS, null === null is true, so this works for guests with user_id = null
+    const isPlayer = isGuest
+      ? playerResult.rows.some((p) => p.user_id === null)
+      : playerResult.rows.some((p) => p.user_id === req.user.userId);
 
     if (!isHost && !isPlayer) {
       return res.status(403).json({ error: 'Access denied. You are not a participant in this game.' });
@@ -228,7 +232,7 @@ const updateGameState = async (req, res) => {
     }
 
     const playerResult = await db.query(
-      'SELECT * FROM game_players WHERE game_id = $1 AND user_id = $2',
+      'SELECT * FROM game_players WHERE game_id = $1 AND user_id IS NOT DISTINCT FROM $2',
       [game_id, req.user.userId]
     );
 
@@ -339,13 +343,22 @@ const addPlayerToGame = async (req, res) => {
       [game_id, user_id || null, nextPosition]
     );
 
-    res.status(201).json({ player: result.rows[0], message: 'Player added to game' });
+    const player = result.rows[0];
+    res.status(201).json({ player, message: 'Player added to game' });
 
+    // Emit socket event so other players see the new player in the lobby
     if (user_id) {
       const userResult = await db.query('SELECT username FROM users WHERE user_id = $1', [user_id]);
       emitPlayerJoined(req.app.get('io'), game_code, {
         user_id,
         username: userResult.rows[0]?.username,
+        player_position: nextPosition,
+      });
+    } else if (req.user?.isGuest) {
+      emitPlayerJoined(req.app.get('io'), game_code, {
+        user_id: null,
+        game_player_id: player.game_player_id,
+        username: req.user.username,
         player_position: nextPosition,
       });
     }

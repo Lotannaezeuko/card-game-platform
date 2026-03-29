@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
@@ -181,9 +182,50 @@ const refreshToken = (req, res) => {
   res.json({ token });
 };
 
+const guest = async (req, res) => {
+  try {
+    const { username, game_code } = req.body;
+
+    if (!username || !game_code) {
+      return res.status(400).json({ error: 'Username and game code are required' });
+    }
+
+    const result = await db.query(
+      'SELECT game_id, status FROM games WHERE game_code = $1',
+      [game_code]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    const game = result.rows[0];
+
+    if (game.status === 'ended') {
+      return res.status(400).json({ error: 'This game has already ended' });
+    }
+
+    const guestId = crypto.randomUUID();
+    const token = jwt.sign(
+      { userId: null, username, guestId, isGuest: true },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN }
+    );
+
+    res.json({
+      token,
+      guest: { guestId, username, gameId: game.game_id },
+    });
+  } catch (error) {
+    console.error('Guest auth error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   register,
   login,
+  guest,
   getMe,
   updatePassword,
   refreshToken,

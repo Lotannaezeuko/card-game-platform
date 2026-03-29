@@ -17,7 +17,7 @@ export default function LobbyPage() {
   const [isHost, setIsHost] = useState(false);
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
-  const [connectedIds, setConnectedIds] = useState(new Set());
+  const [connectedPlayerIds, setConnectedPlayerIds] = useState(new Set());
 
   const gameCodeRef = useRef(null);
   const navigateRef = useRef(navigate);
@@ -35,12 +35,12 @@ export default function LobbyPage() {
         setPlayers(data.players);
         setIsHost(data.game.host_user_id === user?.userId);
         const already = new Set(
-          data.players.filter((p) => p.is_connected).map((p) => p.user_id)
+          data.players.filter((p) => p.is_connected).map((p) => p.game_player_id)
         );
-        setConnectedIds(already);
+        setConnectedPlayerIds(already);
         gameCodeRef.current = data.game.game_code;
       })
-      .catch(() => setError('Failed to load game'));
+      .catch((err) => setError(err.message || 'Failed to load game'));
   }, [gameId, user]); // intentionally omitting navigate — stable ref used
 
   // Socket: join room + bind events
@@ -50,36 +50,46 @@ export default function LobbyPage() {
     socket.emit('join_game', { game_code: game.game_code });
 
     // Server confirms join — also tells us current status
-    socket.on('joined_game', ({ game_code, status }) => {
+    socket.on('joined_game', ({ game_code, status, player_position }) => {
       if (game_code !== game.game_code) return;
-      setConnectedIds((prev) => new Set([...prev, user.userId]));
+      // Find our game_player_id from the players list
+      setPlayers((prev) => {
+        const me = prev.find((p) =>
+          user?.isGuest ? p.user_id === null : p.user_id === user?.userId
+        );
+        if (me) setConnectedPlayerIds((s) => new Set([...s, me.game_player_id]));
+        return prev;
+      });
       // If game already started when we joined (e.g. late joiner), go straight to play
       if (status === 'active') {
         navigateRef.current(`/games/${gameId}/play`, { replace: true });
       }
     });
 
-    socket.on('player_connected', ({ user_id }) => {
-      setConnectedIds((prev) => new Set([...prev, user_id]));
+    socket.on('player_connected', ({ game_player_id }) => {
+      setConnectedPlayerIds((prev) => new Set([...prev, game_player_id]));
     });
 
-    socket.on('player_disconnected', ({ user_id }) => {
-      setConnectedIds((prev) => {
+    socket.on('player_disconnected', ({ game_player_id }) => {
+      setConnectedPlayerIds((prev) => {
         const next = new Set(prev);
-        next.delete(user_id);
+        next.delete(game_player_id);
         return next;
       });
     });
 
-    socket.on('player_joined', ({ user_id, username, player_position }) => {
+    socket.on('player_joined', ({ user_id, game_player_id, username, player_position }) => {
       setPlayers((prev) => {
-        if (prev.some((p) => p.user_id === user_id)) return prev;
-        return [...prev, { user_id, username, player_position, is_connected: false }];
+        if (game_player_id && prev.some((p) => p.game_player_id === game_player_id)) return prev;
+        if (user_id && prev.some((p) => p.user_id === user_id)) return prev;
+        return [...prev, { user_id, game_player_id, username, player_position, is_connected: false }];
       });
     });
 
-    socket.on('player_left', ({ user_id }) => {
-      setPlayers((prev) => prev.filter((p) => p.user_id !== user_id));
+    socket.on('player_left', ({ user_id, game_player_id }) => {
+      setPlayers((prev) => prev.filter((p) =>
+        game_player_id ? p.game_player_id !== game_player_id : p.user_id !== user_id
+      ));
     });
 
     socket.on('game_started', () => {
@@ -167,9 +177,9 @@ export default function LobbyPage() {
           <div className="flex flex-wrap gap-2">
             {players.map((p) => (
               <PlayerChip
-                key={p.user_id}
-                username={p.username + (p.user_id === game.host_user_id ? ' (host)' : '')}
-                isConnected={connectedIds.has(p.user_id)}
+                key={p.game_player_id}
+                username={(p.username || 'Guest') + (p.user_id === game.host_user_id ? ' (host)' : '')}
+                isConnected={connectedPlayerIds.has(p.game_player_id)}
               />
             ))}
             {players.length === 0 && (

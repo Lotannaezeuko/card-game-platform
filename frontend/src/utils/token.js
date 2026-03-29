@@ -9,6 +9,6 @@ export function decodeToken(token) {
 }
 
 export function getUser() {
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token') || localStorage.getItem('token');
   return decodeToken(token);
 }

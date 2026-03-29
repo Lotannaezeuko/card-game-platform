@@ -81,6 +81,11 @@ export default function LoginPage() {
             Register
           </Link>
         </p>
+        <p className="text-center text-sm text-gray-400 mt-2">
+          <Link to="/join" className="hover:underline">
+            Join a game as a guest
+          </Link>
+        </p>
       </div>
     </div>
   );

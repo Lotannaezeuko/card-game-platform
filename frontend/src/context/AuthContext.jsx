@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('token');
+    const stored = sessionStorage.getItem('token') || localStorage.getItem('token');
     if (stored) {
       const decoded = decodeToken(stored);
       if (decoded) {
@@ -17,10 +17,13 @@ export function AuthProvider({ children }) {
         setUser(decoded);
       } else {
         localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
       }
     }
     setLoading(false);
   }, []);
+
+  const isGuest = user?.isGuest === true;
 
   function login(newToken) {
     const decoded = decodeToken(newToken);
@@ -29,18 +32,26 @@ export function AuthProvider({ children }) {
     setUser(decoded);
   }
 
+  function loginAsGuest(newToken) {
+    const decoded = decodeToken(newToken);
+    sessionStorage.setItem('token', newToken);
+    setToken(newToken);
+    setUser(decoded);
+  }
+
   function logout() {
     localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
     setToken(null);
     setUser(null);
   }
 
   function getToken() {
-    return localStorage.getItem('token');
+    return sessionStorage.getItem('token') || localStorage.getItem('token');
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, getToken, loading }}>
+    <AuthContext.Provider value={{ user, token, isGuest, login, loginAsGuest, logout, getToken, loading }}>
       {children}
     </AuthContext.Provider>
   );

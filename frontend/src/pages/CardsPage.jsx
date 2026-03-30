@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../api';
 import TopBar from '../components/layout/TopBar';
 import BottomNav from '../components/layout/BottomNav';
-import CardThumbnail from '../components/cards/CardThumbnail';
+import FlippableCard from '../components/cards/FlippableCard';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Modal from '../components/ui/Modal';
 
@@ -13,6 +13,7 @@ export default function CardsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [flippedCards, setFlippedCards] = useState({});
 
   useEffect(() => {
     apiFetch('/cards')
@@ -55,10 +56,31 @@ export default function CardsPage() {
           <div className="grid grid-cols-2 gap-3">
             {cards.map((card) => (
               <div key={card.card_id} className="relative">
-                <CardThumbnail
-                  card={card}
-                  onClick={() => navigate(`/cards/${card.card_id}/edit`)}
+                <FlippableCard
+                  cardName={card.card_name}
+                  frontText={card.front_text}
+                  frontImageUrl={card.front_image_url}
+                  backText={card.back_text}
+                  backImageUrl={card.back_image_url}
+                  isFlipped={!!flippedCards[card.card_id]}
+                  isSelected={false}
+                  onSelect={() =>
+                    setFlippedCards((prev) => ({
+                      ...prev,
+                      [card.card_id]: !prev[card.card_id],
+                    }))
+                  }
+                  size="library"
                 />
+                {/* Edit */}
+                <button
+                  onClick={() => navigate(`/cards/${card.card_id}/edit`)}
+                  className="absolute top-2 left-2 w-7 h-7 bg-white rounded-full shadow border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-sm"
+                  aria-label="Edit card"
+                >
+                  ✎
+                </button>
+                {/* Delete */}
                 <button
                   onClick={() => setDeleteTarget(card)}
                   className="absolute top-2 right-2 w-7 h-7 bg-white rounded-full shadow border border-gray-200 flex items-center justify-center text-red-400 hover:bg-red-50 text-sm"

@@ -26,6 +26,7 @@ export default function GamePage() {
   const [showScoreboard, setShowScoreboard] = useState(false);
   const [showAdjustTurn, setShowAdjustTurn] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [flippedCardId, setFlippedCardId] = useState(null);
   const [toasts, addToast] = useToasts();
 
   // Stable refs so socket handlers always see latest values without re-running the effect
@@ -63,6 +64,7 @@ export default function GamePage() {
         setIsHost(gameData.game.host_user_id === user?.userId);
         setCurrentPlayerPos(gameData.game.current_player_position ?? 1);
         setHand(handData.hand || []);
+        setFlippedCardId(null);
         if (gameData.discard_top) setDiscardTop(gameData.discard_top);
       })
       .catch(() => addToast('Failed to load game'));
@@ -144,6 +146,7 @@ export default function GamePage() {
       setHand((prev) => prev.filter((c) => c.hand_id !== selectedCardId));
       setDiscardTop(card); // optimistic — socket event will confirm for everyone else
       setSelectedCardId(null);
+      setFlippedCardId(null);
     } catch (err) {
       addToast(err.message || 'Could not play card');
     } finally {
@@ -159,6 +162,7 @@ export default function GamePage() {
       // hand_entry has hand_id and card_id but not full card — refetch hand
       const handData = await apiFetch(`/games/${gameId}/hand`);
       setHand(handData.hand || []);
+      setFlippedCardId(null);
       addToast('You drew a card');
     } catch (err) {
       addToast(err.message || 'Could not draw card');
@@ -282,6 +286,17 @@ export default function GamePage() {
                 onClick={handlePassTurn}
                 color="amber"
               />
+              {selectedCardId && (
+                <ActionBtn
+                  label="Flip Card"
+                  onClick={() =>
+                    setFlippedCardId((prev) =>
+                      prev === selectedCardId ? null : selectedCardId
+                    )
+                  }
+                  color="slate"
+                />
+              )}
             </>
           ) : (
             <div className="text-center px-1">
@@ -311,6 +326,7 @@ export default function GamePage() {
           hand={hand}
           selectedId={selectedCardId}
           onSelect={setSelectedCardId}
+          flippedCardId={flippedCardId}
         />
       </div>
 

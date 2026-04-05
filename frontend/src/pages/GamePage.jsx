@@ -29,6 +29,7 @@ export default function GamePage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [flippedCardId, setFlippedCardId] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null); // 'reshuffle' | 'endgame'
+  const [hideDiscardPile, setHideDiscardPile] = useState(false);
   const [toasts, addToast] = useToasts();
 
   // Stable refs so socket handlers always see latest values without re-running the effect
@@ -54,7 +55,7 @@ export default function GamePage() {
     socket.emit('join_game', { game_code: navState.game_code });
   }, [socket, navState?.game_code]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load game + hand on mount
+  // Load game + hand on mount, then fetch deck settings
   useEffect(() => {
     Promise.all([
       apiFetch(`/games/${gameId}`),
@@ -68,6 +69,16 @@ export default function GamePage() {
         setHand(handData.hand || []);
         setFlippedCardId(null);
         if (gameData.discard_top) setDiscardTop(gameData.discard_top);
+
+        // Fetch deck settings to check hideDiscardPile
+        const deckId = gameData.game.deck_id;
+        if (deckId) {
+          apiFetch(`/decks/${deckId}`)
+            .then((deckData) => {
+              setHideDiscardPile(deckData.attributes?.hideDiscardPile ?? false);
+            })
+            .catch(() => {}); // non-critical — silently ignore
+        }
       })
       .catch(() => addToast('Failed to load game'));
   }, [gameId, user]);
@@ -268,7 +279,7 @@ export default function GamePage() {
         <div className="flex-1 flex items-center justify-center gap-6">
           <div className="flex flex-col items-center gap-1">
             <span className="text-xs text-slate-400">Discard</span>
-            <DiscardPile card={discardTop} />
+            <DiscardPile card={discardTop} hidden={hideDiscardPile} />
           </div>
           <div className="flex flex-col items-center gap-1">
             <span className="text-xs text-slate-400">Draw</span>

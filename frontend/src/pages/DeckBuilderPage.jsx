@@ -24,6 +24,7 @@ export default function DeckBuilderPage() {
   const [totalCards, setTotalCards] = useState('');
   const [shuffleBehaviour, setShuffleBehaviour] = useState('shuffle_before_game');
   const [duplicateHandling, setDuplicateHandling] = useState('allow_duplicates');
+  const [hideDiscardPile, setHideDiscardPile] = useState(false);
 
   // Card library + selection
   const [library, setLibrary] = useState([]);
@@ -45,6 +46,7 @@ export default function DeckBuilderPage() {
         setTotalCards(data.total_cards ?? '');
         setShuffleBehaviour(data.shuffle_behaviour || 'shuffle_before_game');
         setDuplicateHandling(data.duplicate_handling || 'allow_duplicates');
+        setHideDiscardPile(data.attributes?.hideDiscardPile ?? false);
         if (data.cards) {
           setSelectedCards(data.cards.map((c) => ({
             card_id: c.card_id,
@@ -109,6 +111,7 @@ export default function DeckBuilderPage() {
         total_cards: totalCards ? Number(totalCards) : null,
         shuffle_behaviour: shuffleBehaviour,
         duplicate_handling: duplicateHandling,
+        attributes: { hideDiscardPile },
       };
 
       let id = deckId;
@@ -251,6 +254,24 @@ export default function DeckBuilderPage() {
                 With "no duplicates" selected, every card in this deck will be capped at 1 copy. You can still adjust quantities on the next step but they won't go above 1.
               </div>
             )}
+            <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3">
+              <div className="flex-1 pr-4">
+                <p className="text-sm font-medium text-gray-700">Hide discard pile</p>
+                <p className="text-xs text-gray-400 mt-0.5">When enabled, played cards will not be shown to other players.</p>
+              </div>
+              <button
+                onClick={() => setHideDiscardPile((v) => !v)}
+                className={`w-12 h-6 rounded-full transition-colors flex-none ${hideDiscardPile ? 'bg-blue-600' : 'bg-gray-300'}`}
+                role="switch"
+                aria-checked={hideDiscardPile}
+              >
+                <span
+                  className={`block w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${
+                    hideDiscardPile ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
           </>
         )}
 
@@ -379,6 +400,7 @@ export default function DeckBuilderPage() {
               <Row label="Cards selected" value={`${selectedCards.length} types · ${totalSelected} total copies`} />
               <Row label="Shuffle" value={shuffleBehaviour === 'shuffle_before_game' ? 'Before game' : 'None'} />
               <Row label="Duplicates" value={noDuplicates ? 'One copy per card' : 'Multiple copies allowed'} />
+              <Row label="Hide discard pile" value={hideDiscardPile ? 'Yes' : 'No'} />
             </div>
 
             {selectedCards.length > 0 && (

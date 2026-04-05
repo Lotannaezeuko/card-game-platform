@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS decks (
   shuffle_behaviour VARCHAR(50) DEFAULT 'shuffle_before_game',
   duplicate_handling VARCHAR(50) DEFAULT 'allow_duplicates',
   is_public BOOLEAN DEFAULT false,
+  attributes JSONB DEFAULT '{}',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

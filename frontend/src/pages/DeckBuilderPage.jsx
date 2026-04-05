@@ -484,6 +484,7 @@ function CardInspectSheet({ card, isAdded, onAdd, onRemove, onClose }) {
             frontImageUrl={card.front_image_url}
             backText={card.back_text}
             backImageUrl={card.back_image_url}
+            attributes={card.attributes}
             isFlipped={flipped}
             onSelect={() => setFlipped((f) => !f)}
             size="library"

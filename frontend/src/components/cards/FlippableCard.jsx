@@ -7,6 +7,7 @@ import CardBack from './CardBack';
  *   frontImageUrl  – image on the front face
  *   backText       – text on the back face
  *   backImageUrl   – image on the back face
+ *   attributes     – card attributes object ({ backColour, backPattern, ... })
  *   isSelected     – shows a selection ring (hand mode)
  *   isFlipped      – controlled externally; drives the CSS 3D flip
  *   onSelect       – called when the card is tapped
@@ -18,13 +19,15 @@ export default function FlippableCard({
   frontImageUrl,
   backText,
   backImageUrl,
+  attributes = {},
   isSelected = false,
   isFlipped = false,
   onSelect,
   size = 'hand',
 }) {
   const isHand = size === 'hand';
-  const hasBackContent = backText || backImageUrl;
+  const backColour = attributes?.backColour || null;
+  const backPattern = attributes?.backPattern || null;
 
   // ── Sizing ───────────────────────────────────────────────────────
   // hand:    matches existing HandRow card dimensions
@@ -114,15 +117,14 @@ export default function FlippableCard({
           className="absolute inset-0 rounded-xl overflow-hidden"
           style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
         >
-          {hasBackContent ? (
+          {backImageUrl ? (
+            // Priority 1: custom back image (with optional text below)
             <div className="absolute inset-0 bg-white border-2 border-slate-200 rounded-xl flex flex-col overflow-hidden">
-              {backImageUrl && (
-                <img
-                  src={backImageUrl}
-                  alt=""
-                  className={`w-full ${isHand ? 'h-16' : 'h-24'} object-cover flex-none`}
-                />
-              )}
+              <img
+                src={backImageUrl}
+                alt=""
+                className={`w-full ${isHand ? 'h-16' : 'h-24'} object-cover flex-none`}
+              />
               <div className="flex-1 overflow-y-auto min-h-0 p-2">
                 {backText && (
                   <p
@@ -136,7 +138,21 @@ export default function FlippableCard({
               </div>
             </div>
           ) : (
-            <CardBack />
+            // Priority 2+: CardBack (solid colour / pattern / default) with optional text overlay
+            <>
+              <CardBack backColour={backColour} backPattern={backPattern} />
+              {backText && (
+                <div className="absolute inset-0 flex items-center justify-center p-3 pointer-events-none">
+                  <p
+                    className={`${
+                      isHand ? 'text-xs' : 'text-sm'
+                    } text-white text-center leading-tight break-words drop-shadow`}
+                  >
+                    {backText}
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
 

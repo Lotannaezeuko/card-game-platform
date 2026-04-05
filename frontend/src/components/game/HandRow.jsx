@@ -25,6 +25,7 @@ export default function HandRow({ hand, selectedId, onSelect, flippedCardId }) {
             frontImageUrl={card.front_image_url}
             backText={card.back_text}
             backImageUrl={card.back_image_url}
+            attributes={card.attributes}
             isSelected={isSelected}
             isFlipped={card.hand_id === flippedCardId}
             onSelect={() => onSelect(isSelected ? null : card.hand_id)}

@@ -12,6 +12,33 @@ function CameraIcon({ className = 'w-8 h-8' }) {
   );
 }
 
+const PRESET_COLOURS = [
+  { label: 'Deep Red',      value: '#7B1D1D' },
+  { label: 'Navy',          value: '#1E3A5F' },
+  { label: 'Forest Green',  value: '#1C4532' },
+  { label: 'Black',         value: '#1A1A1A' },
+  { label: 'Purple',        value: '#4C1D95' },
+  { label: 'Gold',          value: '#B7791F' },
+  { label: 'Teal',          value: '#134E4A' },
+  { label: 'Crimson',       value: '#831843' },
+];
+
+const STOCK_PATTERNS = [
+  { label: 'Diagonal Stripes', value: 'diagonal-stripes' },
+  { label: 'Diamond Grid',     value: 'diamond-grid' },
+  { label: 'Polka Dots',       value: 'polka-dots' },
+  { label: 'Herringbone',      value: 'herringbone' },
+  { label: 'Crosshatch',       value: 'crosshatch' },
+  { label: 'Chevron',          value: 'chevron' },
+];
+
+// Derive the back style mode from saved attributes
+function deriveBackStyle(attributes) {
+  if (attributes?.backColour) return 'colour';
+  if (attributes?.backPattern) return 'pattern';
+  return 'custom';
+}
+
 /**
  * Self-contained card builder form.
  *
@@ -30,6 +57,7 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [backStyle, setBackStyle] = useState('custom');
 
   const fileInputRef = useRef(null);
 
@@ -41,20 +69,26 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
     back_image_url: '',
     default_copies: 1,
     is_unique: false,
+    attributes: {},
   });
 
   useEffect(() => {
     if (!isEdit) return;
     apiFetch(`/cards/${cardId}`)
-      .then((data) => setCard({
-        card_name: data.card_name || '',
-        front_text: data.front_text || '',
-        front_image_url: data.front_image_url || '',
-        back_text: data.back_text || '',
-        back_image_url: data.back_image_url || '',
-        default_copies: data.default_copies || 1,
-        is_unique: data.is_unique || false,
-      }))
+      .then((data) => {
+        const attrs = data.attributes || {};
+        setCard({
+          card_name: data.card_name || '',
+          front_text: data.front_text || '',
+          front_image_url: data.front_image_url || '',
+          back_text: data.back_text || '',
+          back_image_url: data.back_image_url || '',
+          default_copies: data.default_copies || 1,
+          is_unique: data.is_unique || false,
+          attributes: attrs,
+        });
+        setBackStyle(deriveBackStyle(attrs));
+      })
       .catch(() => setError('Could not load card.'))
       .finally(() => setLoading(false));
   }, [cardId, isEdit]);
@@ -63,9 +97,50 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
     setCard((c) => ({ ...c, [field]: value }));
   }
 
+  function updateAttr(key, value) {
+    setCard((c) => ({ ...c, attributes: { ...c.attributes, [key]: value } }));
+  }
+
+  function handleBackStyleChange(style) {
+    setBackStyle(style);
+    if (style === 'custom') {
+      // Clear any colour/pattern from attributes
+      setCard((c) => {
+        const { backColour, backPattern, ...rest } = c.attributes;
+        return { ...c, attributes: rest };
+      });
+    } else if (style === 'colour') {
+      // Clear pattern; set a default colour if none selected yet
+      setCard((c) => {
+        const { backPattern, ...rest } = c.attributes;
+        return {
+          ...c,
+          attributes: {
+            ...rest,
+            backColour: c.attributes.backColour || PRESET_COLOURS[0].value,
+          },
+        };
+      });
+    } else if (style === 'pattern') {
+      // Clear colour; set a default pattern if none selected yet
+      setCard((c) => {
+        const { backColour, ...rest } = c.attributes;
+        return {
+          ...c,
+          attributes: {
+            ...rest,
+            backPattern: c.attributes.backPattern || STOCK_PATTERNS[0].value,
+          },
+        };
+      });
+    }
+  }
+
   const isFront = activeTab === 'front';
   const currentImageField = isFront ? 'front_image_url' : 'back_image_url';
   const currentImageUrl = isFront ? card.front_image_url : card.back_image_url;
+  // Disable image upload interaction on back tab when a colour/pattern style is chosen
+  const imageClickEnabled = !uploading && (isFront || backStyle === 'custom');
 
   async function handleFileChange(e) {
     const file = e.target.files?.[0];
@@ -109,6 +184,7 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
         back_image_url: card.back_image_url || null,
         default_copies: card.default_copies,
         is_unique: card.is_unique,
+        attributes: card.attributes,
       };
       let saved;
       if (isEdit) {
@@ -177,17 +253,19 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
         {/* Interactive card preview — tap to upload image */}
         <div
           className="relative"
-          onClick={!uploading ? () => fileInputRef.current?.click() : undefined}
-          style={{ cursor: uploading ? 'default' : 'pointer' }}
+          onClick={imageClickEnabled ? () => fileInputRef.current?.click() : undefined}
+          style={{ cursor: imageClickEnabled ? 'pointer' : 'default' }}
         >
           <CardPreview
             frontText={card.front_text}
             frontImageUrl={card.front_image_url}
             backText={card.back_text}
             backImageUrl={card.back_image_url}
+            attributes={card.attributes}
             showBack={!isFront}
           />
-          {!currentImageUrl && !uploading && (
+          {/* Show camera hint only if image upload is active and no image set */}
+          {imageClickEnabled && !currentImageUrl && !uploading && (
             <div className="absolute top-0 left-0 right-0 h-36 flex flex-col items-center justify-center pointer-events-none">
               <CameraIcon className="w-8 h-8 text-gray-300" />
               <span className="text-xs text-gray-400 mt-1">Tap to add image</span>
@@ -198,7 +276,7 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
               <LoadingSpinner />
             </div>
           )}
-          {currentImageUrl && !uploading && (
+          {currentImageUrl && imageClickEnabled && !uploading && (
             <div className="absolute top-2 right-2 bg-black/40 rounded-full p-1 pointer-events-none">
               <CameraIcon className="w-3.5 h-3.5 text-white" />
             </div>
@@ -214,7 +292,98 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
         />
         {uploadError && <p className="text-red-600 text-xs self-start -mt-4">{uploadError}</p>}
 
-        {/* Text content */}
+        {/* ── Back tab: Card Back Style section ─────────────────────── */}
+        {!isFront && (
+          <div className="w-full">
+            <p className="text-sm font-medium text-gray-700 mb-2">Card Back Style</p>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'custom',  label: 'Custom',        desc: 'Image or text' },
+                { id: 'colour',  label: 'Solid Colour',  desc: 'Pick a colour' },
+                { id: 'pattern', label: 'Stock Pattern',  desc: 'Built-in design' },
+              ].map(({ id, label, desc }) => (
+                <button
+                  key={id}
+                  onClick={() => handleBackStyleChange(id)}
+                  className={`flex flex-col items-center justify-center rounded-xl border-2 py-3 px-1 text-center transition-colors ${
+                    backStyle === id
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  <span className={`text-xs font-semibold ${backStyle === id ? 'text-blue-700' : 'text-gray-700'}`}>
+                    {label}
+                  </span>
+                  <span className="text-xs text-gray-400 mt-0.5">{desc}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Colour swatches */}
+            {backStyle === 'colour' && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-gray-500 mb-2">Choose a colour</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {PRESET_COLOURS.map(({ label, value }) => (
+                    <button
+                      key={value}
+                      title={label}
+                      onClick={() => updateAttr('backColour', value)}
+                      className={`w-full aspect-square rounded-lg border-2 transition-transform ${
+                        card.attributes.backColour === value
+                          ? 'border-blue-500 scale-110'
+                          : 'border-transparent hover:border-gray-300'
+                      }`}
+                      style={{ backgroundColor: value }}
+                    >
+                      {card.attributes.backColour === value && (
+                        <span className="flex items-center justify-center w-full h-full text-white text-base">✓</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {/* Custom colour picker */}
+                <div className="mt-3 flex items-center gap-2">
+                  <label className="text-xs text-gray-500 flex-none">Custom:</label>
+                  <input
+                    type="color"
+                    value={card.attributes.backColour || PRESET_COLOURS[0].value}
+                    onChange={(e) => updateAttr('backColour', e.target.value)}
+                    className="w-10 h-8 rounded border border-gray-200 cursor-pointer p-0.5"
+                  />
+                  <span className="text-xs text-gray-400">{card.attributes.backColour || ''}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Pattern tiles */}
+            {backStyle === 'pattern' && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-gray-500 mb-2">Choose a pattern</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {STOCK_PATTERNS.map(({ label, value }) => (
+                    <button
+                      key={value}
+                      onClick={() => updateAttr('backPattern', value)}
+                      className={`flex flex-col items-center rounded-xl border-2 py-2 px-1 text-center transition-colors ${
+                        card.attributes.backPattern === value
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <PatternThumbnail pattern={value} />
+                      <span className={`text-xs mt-1.5 font-medium ${card.attributes.backPattern === value ? 'text-blue-700' : 'text-gray-600'}`}>
+                        {label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Text content — always shown; on back tab also shown under Custom or alongside any style */}
         <div className="w-full">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             {isFront ? 'Front Text' : 'Back Text'} {isFront && <span className="text-red-500">*</span>}
@@ -228,19 +397,21 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
           />
         </div>
 
-        {/* Paste image URL fallback */}
-        <div className="w-full">
-          <label className="block text-xs font-medium text-gray-400 mb-1">
-            Or paste image URL <span className="font-normal">(optional)</span>
-          </label>
-          <input
-            type="url"
-            value={currentImageUrl}
-            onChange={(e) => update(currentImageField, e.target.value)}
-            placeholder="https://example.com/image.jpg"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
+        {/* Paste image URL fallback — only relevant when image upload is active */}
+        {(isFront || backStyle === 'custom') && (
+          <div className="w-full">
+            <label className="block text-xs font-medium text-gray-400 mb-1">
+              Or paste image URL <span className="font-normal">(optional)</span>
+            </label>
+            <input
+              type="url"
+              value={currentImageUrl}
+              onChange={(e) => update(currentImageField, e.target.value)}
+              placeholder="https://example.com/image.jpg"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+        )}
 
         {/* Card Rules toggle */}
         <button
@@ -285,5 +456,51 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
         )}
       </main>
     </div>
+  );
+}
+
+// Small SVG thumbnail previewing a pattern inside the tile button
+function PatternThumbnail({ pattern }) {
+  const patternId = `thumb-${pattern}`;
+
+  const defs = {
+    'diagonal-stripes': (
+      <pattern id={patternId} x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect x="0" y="0" width="5" height="10" fill="rgba(255,255,255,0.3)" />
+      </pattern>
+    ),
+    'diamond-grid': (
+      <pattern id={patternId} x="0" y="0" width="18" height="18" patternUnits="userSpaceOnUse">
+        <path d="M9 1 L17 9 L9 17 L1 9 Z" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
+      </pattern>
+    ),
+    'polka-dots': (
+      <pattern id={patternId} x="0" y="0" width="14" height="14" patternUnits="userSpaceOnUse">
+        <circle cx="7" cy="7" r="3" fill="rgba(255,255,255,0.4)" />
+      </pattern>
+    ),
+    'herringbone': (
+      <pattern id={patternId} x="0" y="0" width="12" height="12" patternUnits="userSpaceOnUse">
+        <path d="M0 12 L6 6 L12 12 M0 6 L6 0 L12 6" stroke="rgba(255,255,255,0.4)" strokeWidth="2" fill="none" />
+      </pattern>
+    ),
+    'crosshatch': (
+      <pattern id={patternId} x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
+        <path d="M0 5 H10 M5 0 V10" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" fill="none" />
+      </pattern>
+    ),
+    'chevron': (
+      <pattern id={patternId} x="0" y="0" width="14" height="7" patternUnits="userSpaceOnUse">
+        <path d="M0 7 L7 0 L14 7" stroke="rgba(255,255,255,0.4)" strokeWidth="2" fill="none" />
+      </pattern>
+    ),
+  };
+
+  return (
+    <svg width="40" height="40" viewBox="0 0 40 40" className="rounded-md overflow-hidden">
+      <defs>{defs[pattern]}</defs>
+      <rect width="40" height="40" fill="#3730a3" />
+      <rect width="40" height="40" fill={`url(#${patternId})`} />
+    </svg>
   );
 }

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '../api';
 import CardThumbnail from '../components/cards/CardThumbnail';
 import FlippableCard from '../components/cards/FlippableCard';
+import CardBuilderForm from '../components/cards/CardBuilderForm';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 const TOTAL_STEPS = 5;
@@ -29,6 +30,7 @@ export default function DeckBuilderPage() {
   const [search, setSearch] = useState('');
   const [selectedCards, setSelectedCards] = useState([]); // { card_id, card_name, front_text, is_unique, quantity }
   const [inspectCard, setInspectCard] = useState(null);
+  const [showCardBuilder, setShowCardBuilder] = useState(false);
 
   // Derived
   const noDuplicates = duplicateHandling === 'no_duplicates';
@@ -271,6 +273,15 @@ export default function DeckBuilderPage() {
               <p className="text-sm text-gray-400 text-center py-8">No cards found.</p>
             )}
             <div className="grid grid-cols-2 gap-3">
+              {/* New Card tile — always first */}
+              <button
+                onClick={() => setShowCardBuilder(true)}
+                className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 min-h-[160px] text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+              >
+                <span className="text-3xl font-light leading-none">+</span>
+                <span className="text-xs font-medium">New Card</span>
+              </button>
+
               {filteredLibrary.map((card) => {
                 const added = selectedCards.some((c) => c.card_id === card.card_id);
                 return (
@@ -383,6 +394,19 @@ export default function DeckBuilderPage() {
           </>
         )}
       </main>
+
+      {/* ── New card builder overlay ── */}
+      {showCardBuilder && (
+        <div className="fixed inset-0 z-50 bg-gray-50 overflow-y-auto">
+          <CardBuilderForm
+            onSaved={(newCard) => {
+              setLibrary((prev) => [newCard, ...prev]);
+              setShowCardBuilder(false);
+            }}
+            onCancel={() => setShowCardBuilder(false)}
+          />
+        </div>
+      )}
 
       {/* ── Card inspect sheet ── */}
       {inspectCard && (

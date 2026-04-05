@@ -10,7 +10,7 @@
     "seed": "psql postgresql://lotannaezeuko@localhost:5432/card_game_db -f db/seed.sql",
     "seed:decks": "node db/seed-decks.js",
     "db:reset": "psql postgresql://lotannaezeuko@localhost:5432/card_game_db -f db/reset.sql",
-    "db:fresh": "npm run db:reset && npm run seed"
+    "db:fresh": "npm run db:reset && npm run seed && npm run seed:decks"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

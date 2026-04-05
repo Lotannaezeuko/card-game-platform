@@ -199,7 +199,7 @@ export default function DeckBuilderPage() {
                 className={inputClass}
               />
             </Field>
-            <Field label="Total Cards" hint="optional — set a target size for this deck">
+            <Field label="Max cards in deck" hint="Optional. Sets the upper limit for how many cards this deck can contain.">
               <input
                 type="number"
                 min={1}
@@ -291,7 +291,7 @@ export default function DeckBuilderPage() {
 
             {/* Running tally */}
             <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex justify-between items-center">
-              <span className="text-sm text-blue-700 font-medium">Total cards in deck</span>
+              <span className="text-sm text-blue-700 font-medium">Cards in deck</span>
               <span className="text-xl font-bold text-blue-700">{totalSelected}</span>
             </div>
 
@@ -361,7 +361,7 @@ export default function DeckBuilderPage() {
             <h2 className="font-bold text-gray-900 text-lg">Review Deck</h2>
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-col gap-2">
               <Row label="Name" value={deckName} />
-              {totalCards && <Row label="Target total" value={totalCards} />}
+              {totalCards && <Row label="Max cards" value={totalCards} />}
               <Row label="Cards selected" value={`${selectedCards.length} types · ${totalSelected} total copies`} />
               <Row label="Shuffle" value={shuffleBehaviour === 'shuffle_before_game' ? 'Before game' : 'None'} />
               <Row label="Duplicates" value={noDuplicates ? 'One copy per card' : 'Multiple copies allowed'} />

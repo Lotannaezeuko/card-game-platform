@@ -123,12 +123,12 @@ export default function FlippableCard({
                   className={`w-full ${isHand ? 'h-16' : 'h-24'} object-cover flex-none`}
                 />
               )}
-              <div className="flex-1 flex items-center justify-center p-2 min-h-0">
+              <div className="flex-1 overflow-y-auto min-h-0 p-2">
                 {backText && (
                   <p
                     className={`${
                       isHand ? 'text-xs' : 'text-sm'
-                    } text-slate-700 text-center leading-tight line-clamp-4`}
+                    } text-slate-700 text-center leading-tight break-words`}
                   >
                     {backText}
                   </p>

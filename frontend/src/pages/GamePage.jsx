@@ -8,6 +8,7 @@ import DiscardPile, { DrawPileCard } from '../components/game/DiscardPile';
 import HandRow from '../components/game/HandRow';
 import ScoreboardOverlay from '../components/game/ScoreboardOverlay';
 import ToastContainer, { useToasts } from '../components/ui/Toast';
+import Modal from '../components/ui/Modal';
 
 export default function GamePage() {
   const { gameId } = useParams();
@@ -27,6 +28,7 @@ export default function GamePage() {
   const [showAdjustTurn, setShowAdjustTurn] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [flippedCardId, setFlippedCardId] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null); // 'reshuffle' | 'endgame'
   const [toasts, addToast] = useToasts();
 
   // Stable refs so socket handlers always see latest values without re-running the effect
@@ -184,7 +186,12 @@ export default function GamePage() {
     }
   }, [actionLoading, gameId]);
 
-  const handleReshuffle = useCallback(async () => {
+  const handleReshuffle = useCallback(() => {
+    setConfirmDialog('reshuffle');
+  }, []);
+
+  const confirmReshuffle = useCallback(async () => {
+    setConfirmDialog(null);
     try {
       await apiFetch(`/games/${gameId}/reshuffle`, { method: 'POST' });
     } catch (err) {
@@ -204,7 +211,12 @@ export default function GamePage() {
     }
   }, [gameId]);
 
-  const handleEndGame = useCallback(async () => {
+  const handleEndGame = useCallback(() => {
+    setConfirmDialog('endgame');
+  }, []);
+
+  const confirmEndGame = useCallback(async () => {
+    setConfirmDialog(null);
     try {
       await apiFetch(`/games/${gameId}/session/end`, { method: 'PUT' });
       // Host navigates directly — user 2 navigates via game_ended socket event
@@ -339,6 +351,29 @@ export default function GamePage() {
           gameId={gameId}
           isHost={isHost}
           onClose={() => setShowScoreboard(false)}
+        />
+      )}
+
+      {/* ── Confirm: Reshuffle ── */}
+      {confirmDialog === 'reshuffle' && (
+        <Modal
+          title="Reshuffle deck?"
+          message="All discarded cards will be returned to the draw pile."
+          confirmLabel="Reshuffle"
+          onConfirm={confirmReshuffle}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {/* ── Confirm: End Game ── */}
+      {confirmDialog === 'endgame' && (
+        <Modal
+          title="End session?"
+          message="Are you sure you want to end the session? This cannot be undone."
+          confirmLabel="End Game"
+          danger
+          onConfirm={confirmEndGame}
+          onCancel={() => setConfirmDialog(null)}
         />
       )}
 

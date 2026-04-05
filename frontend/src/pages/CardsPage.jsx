@@ -7,31 +7,54 @@ import FlippableCard from '../components/cards/FlippableCard';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Modal from '../components/ui/Modal';
 
+const PAGE_SIZE = 50;
+
 export default function CardsPage() {
   const navigate = useNavigate();
   const [cards, setCards] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [flippedCards, setFlippedCards] = useState({});
 
   useEffect(() => {
-    apiFetch('/cards')
-      .then((data) => setCards(data.cards || []))
+    apiFetch(`/cards?limit=${PAGE_SIZE}&offset=0`)
+      .then((data) => {
+        setCards(data.cards || []);
+        setTotal(data.pagination?.total ?? 0);
+      })
       .catch(() => setError('Could not load cards. Please try again.'))
       .finally(() => setLoading(false));
   }, []);
+
+  async function loadMore() {
+    setLoadingMore(true);
+    try {
+      const data = await apiFetch(`/cards?limit=${PAGE_SIZE}&offset=${cards.length}`);
+      setCards((prev) => [...prev, ...(data.cards || [])]);
+      setTotal(data.pagination?.total ?? total);
+    } catch {
+      setError('Could not load more cards. Please try again.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   async function confirmDelete() {
     try {
       await apiFetch(`/cards/${deleteTarget.card_id}`, { method: 'DELETE' });
       setCards((prev) => prev.filter((c) => c.card_id !== deleteTarget.card_id));
+      setTotal((prev) => prev - 1);
     } catch {
       setError('Could not delete card. It may be in use by a deck.');
     } finally {
       setDeleteTarget(null);
     }
   }
+
+  const hasMore = cards.length < total;
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -53,44 +76,58 @@ export default function CardsPage() {
         )}
 
         {!loading && cards.length > 0 && (
-          <div className="grid grid-cols-2 gap-3">
-            {cards.map((card) => (
-              <div key={card.card_id} className="relative">
-                <FlippableCard
-                  cardName={card.card_name}
-                  frontText={card.front_text}
-                  frontImageUrl={card.front_image_url}
-                  backText={card.back_text}
-                  backImageUrl={card.back_image_url}
-                  isFlipped={!!flippedCards[card.card_id]}
-                  isSelected={false}
-                  onSelect={() =>
-                    setFlippedCards((prev) => ({
-                      ...prev,
-                      [card.card_id]: !prev[card.card_id],
-                    }))
-                  }
-                  size="library"
-                />
-                {/* Edit */}
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              {cards.map((card) => (
+                <div key={card.card_id} className="relative">
+                  <FlippableCard
+                    cardName={card.card_name}
+                    frontText={card.front_text}
+                    frontImageUrl={card.front_image_url}
+                    backText={card.back_text}
+                    backImageUrl={card.back_image_url}
+                    isFlipped={!!flippedCards[card.card_id]}
+                    isSelected={false}
+                    onSelect={() =>
+                      setFlippedCards((prev) => ({
+                        ...prev,
+                        [card.card_id]: !prev[card.card_id],
+                      }))
+                    }
+                    size="library"
+                  />
+                  {/* Edit */}
+                  <button
+                    onClick={() => navigate(`/cards/${card.card_id}/edit`)}
+                    className="absolute top-2 left-2 w-7 h-7 bg-white rounded-full shadow border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-sm"
+                    aria-label="Edit card"
+                  >
+                    ✎
+                  </button>
+                  {/* Delete */}
+                  <button
+                    onClick={() => setDeleteTarget(card)}
+                    className="absolute top-2 right-2 w-7 h-7 bg-white rounded-full shadow border border-gray-200 flex items-center justify-center text-red-400 hover:bg-red-50 text-sm"
+                    aria-label="Delete card"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {hasMore && (
+              <div className="mt-6 flex justify-center">
                 <button
-                  onClick={() => navigate(`/cards/${card.card_id}/edit`)}
-                  className="absolute top-2 left-2 w-7 h-7 bg-white rounded-full shadow border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-sm"
-                  aria-label="Edit card"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="px-6 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
                 >
-                  ✎
-                </button>
-                {/* Delete */}
-                <button
-                  onClick={() => setDeleteTarget(card)}
-                  className="absolute top-2 right-2 w-7 h-7 bg-white rounded-full shadow border border-gray-200 flex items-center justify-center text-red-400 hover:bg-red-50 text-sm"
-                  aria-label="Delete card"
-                >
-                  ×
+                  {loadingMore ? 'Loading…' : `See more (${total - cards.length} remaining)`}
                 </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </main>
 

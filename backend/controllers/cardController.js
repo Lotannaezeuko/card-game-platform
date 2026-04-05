@@ -4,42 +4,29 @@ const DEFAULT_LIMIT = 50;
 
 const getAllCards = async (req, res) => {
   try {
-    const { created_by, limit, offset } = req.query;
+    const { limit, offset } = req.query;
+    const userId = req.user.userId;
 
     const queryLimit = Math.min(parseInt(limit) || DEFAULT_LIMIT, 100);
     const queryOffset = parseInt(offset) || 0;
 
-    let query = `
+    const query = `
       SELECT c.card_id, c.card_name, c.front_text, c.front_image_url,
              c.back_text, c.back_image_url, c.default_copies, c.is_unique,
              c.attributes, c.created_at, c.updated_at,
              c.created_by_user_id, u.username AS creator_username
       FROM cards c
       LEFT JOIN users u ON c.created_by_user_id = u.user_id
-      WHERE 1=1
+      WHERE c.created_by_user_id = $1
+      ORDER BY c.created_at DESC LIMIT $2 OFFSET $3
     `;
-    const params = [];
-    let paramIndex = 1;
 
-    if (created_by) {
-      query += ` AND c.created_by_user_id = $${paramIndex++}`;
-      params.push(created_by);
-    }
+    const result = await db.query(query, [userId, queryLimit, queryOffset]);
 
-    query += ` ORDER BY c.created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
-    params.push(queryLimit, queryOffset);
-
-    const result = await db.query(query, params);
-
-    const countQuery = `
-      SELECT COUNT(*) FROM cards c
-      WHERE 1=1
-      ${created_by ? 'AND c.created_by_user_id = $1' : ''}
-    `;
-    const countParams = [];
-    if (created_by) countParams.push(created_by);
-
-    const countResult = await db.query(countQuery, countParams);
+    const countResult = await db.query(
+      'SELECT COUNT(*) FROM cards WHERE created_by_user_id = $1',
+      [userId]
+    );
 
     res.json({
       cards: result.rows,

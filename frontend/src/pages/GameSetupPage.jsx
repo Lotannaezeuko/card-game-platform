@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { apiFetch } from '../api';
 import TopBar from '../components/layout/TopBar';
 import BottomNav from '../components/layout/BottomNav';
 
 export default function GameSetupPage() {
   const navigate = useNavigate();
+  const { state: navState } = useLocation();
   const [tab, setTab] = useState('host'); // 'host' | 'join'
 
   // Host form state
@@ -23,9 +24,16 @@ export default function GameSetupPage() {
 
   useEffect(() => {
     apiFetch('/decks')
-      .then((data) => setDecks(data.decks || []))
+      .then((data) => {
+        const loaded = data.decks || [];
+        setDecks(loaded);
+        if (navState?.deck_id) {
+          const match = loaded.find((d) => d.deck_id === navState.deck_id);
+          if (match) setDeckId(String(match.deck_id));
+        }
+      })
       .catch(() => setError('Failed to load decks'));
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleHost(e) {
     e.preventDefault();

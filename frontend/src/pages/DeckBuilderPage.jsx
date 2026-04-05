@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '../api';
 import CardThumbnail from '../components/cards/CardThumbnail';
+import FlippableCard from '../components/cards/FlippableCard';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 const TOTAL_STEPS = 5;
@@ -27,6 +28,7 @@ export default function DeckBuilderPage() {
   const [library, setLibrary] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedCards, setSelectedCards] = useState([]); // { card_id, card_name, front_text, is_unique, quantity }
+  const [inspectCard, setInspectCard] = useState(null);
 
   // Derived
   const noDuplicates = duplicateHandling === 'no_duplicates';
@@ -275,6 +277,7 @@ export default function DeckBuilderPage() {
                   <CardThumbnail
                     key={card.card_id}
                     card={card}
+                    onInspect={setInspectCard}
                     action={added ? () => removeCard(card.card_id) : addCard}
                     actionLabel={added ? 'Remove' : 'Add'}
                   />
@@ -380,6 +383,17 @@ export default function DeckBuilderPage() {
           </>
         )}
       </main>
+
+      {/* ── Card inspect sheet ── */}
+      {inspectCard && (
+        <CardInspectSheet
+          card={inspectCard}
+          isAdded={selectedCards.some((c) => c.card_id === inspectCard.card_id)}
+          onAdd={() => { addCard(inspectCard); setInspectCard(null); }}
+          onRemove={() => { removeCard(inspectCard.card_id); setInspectCard(null); }}
+          onClose={() => setInspectCard(null)}
+        />
+      )}
     </div>
   );
 }
@@ -403,6 +417,86 @@ function Field({ label, hint, required, children }) {
 function Row({ label, value }) {
   return (
     <div className="flex justify-between text-sm">
+      <span className="text-gray-500">{label}</span>
+      <span className="font-medium text-gray-900">{value}</span>
+    </div>
+  );
+}
+
+function CardInspectSheet({ card, isAdded, onAdd, onRemove, onClose }) {
+  const [flipped, setFlipped] = useState(false);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col justify-end"
+      onClick={onClose}
+    >
+      {/* Scrim */}
+      <div className="absolute inset-0 bg-black/50" />
+
+      {/* Sheet */}
+      <div
+        className="relative bg-white rounded-t-3xl px-5 pt-5 pb-8 flex flex-col gap-5 max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Drag handle + close */}
+        <div className="flex items-center justify-between">
+          <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto absolute left-1/2 -translate-x-1/2 top-3" />
+          <h2 className="text-base font-bold text-gray-900 truncate flex-1">{card.card_name}</h2>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-lg leading-none flex-none ml-2"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Card preview — centred, tap to flip */}
+        <div className="flex flex-col items-center gap-2">
+          <FlippableCard
+            cardName={card.card_name}
+            frontText={card.front_text}
+            frontImageUrl={card.front_image_url}
+            backText={card.back_text}
+            backImageUrl={card.back_image_url}
+            isFlipped={flipped}
+            onSelect={() => setFlipped((f) => !f)}
+            size="library"
+          />
+          <p className="text-xs text-gray-400">Tap card to flip</p>
+        </div>
+
+        {/* Card rules */}
+        <div className="bg-gray-50 rounded-2xl px-4 py-3 flex flex-col gap-2.5">
+          <RuleRow label="Default copies" value={card.default_copies ?? 1} />
+          <RuleRow label="Unique card" value={card.is_unique ? 'Yes — max 1 copy per deck' : 'No'} />
+        </div>
+
+        {/* Action */}
+        {isAdded ? (
+          <button
+            onClick={onRemove}
+            className="w-full py-3.5 rounded-2xl border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50 transition-colors"
+          >
+            Remove from Deck
+          </button>
+        ) : (
+          <button
+            onClick={onAdd}
+            className="w-full py-3.5 rounded-2xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Add to Deck
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RuleRow({ label, value }) {
+  return (
+    <div className="flex justify-between items-center text-sm">
       <span className="text-gray-500">{label}</span>
       <span className="font-medium text-gray-900">{value}</span>
     </div>

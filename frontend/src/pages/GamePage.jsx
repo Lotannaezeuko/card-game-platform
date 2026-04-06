@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { apiFetch } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import PlayerChip from '../components/game/PlayerChip';
 import DiscardPile, { DrawPileCard } from '../components/game/DiscardPile';
 import HandRow from '../components/game/HandRow';
+import GameBoard from '../components/game/GameBoard';
+import FlippableCard from '../components/cards/FlippableCard';
 import ScoreboardOverlay from '../components/game/ScoreboardOverlay';
 import ToastContainer, { useToasts } from '../components/ui/Toast';
 import Modal from '../components/ui/Modal';
@@ -30,6 +33,10 @@ export default function GamePage() {
   const [flippedCardId, setFlippedCardId] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null); // 'reshuffle' | 'endgame'
   const [hideDiscardPile, setHideDiscardPile] = useState(false);
+  const [boardCards, setBoardCards] = useState([]);
+  const [boardScale, setBoardScale] = useState(1);
+  const [showBoard, setShowBoard] = useState(false);
+  const [activeDragCard, setActiveDragCard] = useState(null);
   const [toasts, addToast] = useToasts();
 
   // Stable refs so socket handlers always see latest values without re-running the effect
@@ -69,13 +76,28 @@ export default function GamePage() {
         setHand(handData.hand || []);
         setFlippedCardId(null);
         if (gameData.discard_top) setDiscardTop(gameData.discard_top);
+        setBoardCards(gameData.game.game_state?.board || []);
+        // All players read hideDiscardPile from game_state (host writes it there after deck fetch)
+        setHideDiscardPile(gameData.game.game_state?.hideDiscardPile ?? false);
 
-        // Fetch deck settings to check hideDiscardPile
+        // Host-only: fetch deck settings and persist hideDiscardPile into game_state
+        // so non-owner players (who can't access private decks) still see the right value
         const deckId = gameData.game.deck_id;
-        if (deckId) {
+        const isHostNow = gameData.game.host_user_id === user?.userId;
+        if (deckId && isHostNow) {
           apiFetch(`/decks/${deckId}`)
-            .then((deckData) => {
-              setHideDiscardPile(deckData.attributes?.hideDiscardPile ?? false);
+            .then(async (deckData) => {
+              const val = deckData.attributes?.hideDiscardPile ?? false;
+              setHideDiscardPile(val);
+              // Only write to game_state if the value differs from what's already there
+              if (val !== (gameData.game.game_state?.hideDiscardPile ?? false)) {
+                try {
+                  await apiFetch(`/games/${gameId}/state`, {
+                    method: 'PUT',
+                    body: { game_state: { ...(gameData.game.game_state || {}), hideDiscardPile: val } },
+                  });
+                } catch { /* non-critical */ }
+              }
             })
             .catch(() => {}); // non-critical — silently ignore
         }
@@ -97,7 +119,10 @@ export default function GamePage() {
 
     socket.on('card_played', ({ user_id, username, card }) => {
       setDiscardTop(card);
-      if (user_id !== userRef.current?.userId) addToast(`${username} played ${card.card_name}`);
+      if (user_id !== userRef.current?.userId) {
+        addToast(`${username} played ${card.card_name}`);
+        refetchBoardRef.current();
+      }
     });
 
     socket.on('turn_passed', ({ current_player_position }) => {
@@ -140,6 +165,21 @@ export default function GamePage() {
       socket.off('player_disconnected');
     };
   }, [socket, game]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Board helpers ─────────────────────────────────────────────────
+  const refetchBoard = useCallback(async () => {
+    try {
+      const gameData = await apiFetch(`/games/${gameId}`);
+      setBoardCards(gameData.game.game_state?.board || []);
+      if (gameData.discard_top) setDiscardTop(gameData.discard_top);
+      setHideDiscardPile(gameData.game.game_state?.hideDiscardPile ?? false);
+    } catch {
+      // non-critical — board will sync on next event
+    }
+  }, [gameId]);
+
+  const refetchBoardRef = useRef(refetchBoard);
+  useEffect(() => { refetchBoardRef.current = refetchBoard; }, [refetchBoard]);
 
   // ── Actions ──────────────────────────────────────────────────────
   // Use a ref so handlePlayCard can read the latest hand without being in the dep array
@@ -237,6 +277,95 @@ export default function GamePage() {
     }
   }, [gameId, navigate]);
 
+  // ── Board actions ──────────────────────────────────────────────────
+  const handleCardDroppedOnBoard = useCallback(async (card, x, y) => {
+    const newBoardCard = {
+      ...card,
+      placedBy: user?.username,
+      x: Math.max(0, x),
+      y: Math.max(0, y),
+    };
+    const newBoard = [...boardCards, newBoardCard];
+    // Optimistic updates
+    setBoardCards(newBoard);
+    setHand((prev) => prev.filter((c) => c.hand_id !== card.hand_id));
+    try {
+      await apiFetch(`/games/${gameId}/play`, { method: 'POST', body: { hand_id: card.hand_id } });
+      const currentGame = await apiFetch(`/games/${gameId}`);
+      await apiFetch(`/games/${gameId}/state`, {
+        method: 'PUT',
+        body: { game_state: { ...(currentGame.game.game_state || {}), board: newBoard } },
+      });
+      // Fix discardTop incorrectly set by the card_played socket event
+      await refetchBoard();
+    } catch (err) {
+      setBoardCards((prev) => prev.filter((c) => c.hand_id !== card.hand_id));
+      setHand((prev) => [...prev, card]);
+      addToast(err.message || 'Could not place card on board');
+    }
+  }, [boardCards, gameId, user, refetchBoard]);
+
+  const handleBoardCardRepositioned = useCallback(async (card, newX, newY) => {
+    const newBoard = boardCards.map((c) =>
+      c.hand_id === card.hand_id ? { ...c, x: Math.max(0, newX), y: Math.max(0, newY) } : c
+    );
+    setBoardCards(newBoard);
+    try {
+      const currentGame = await apiFetch(`/games/${gameId}`);
+      await apiFetch(`/games/${gameId}/state`, {
+        method: 'PUT',
+        body: { game_state: { ...(currentGame.game.game_state || {}), board: newBoard } },
+      });
+    } catch {
+      refetchBoard();
+    }
+  }, [boardCards, gameId, refetchBoard]);
+
+  const handleClearBoard = useCallback(async () => {
+    if (!isHost) return;
+    setBoardCards([]);
+    try {
+      const currentGame = await apiFetch(`/games/${gameId}`);
+      await apiFetch(`/games/${gameId}/state`, {
+        method: 'PUT',
+        body: { game_state: { ...(currentGame.game.game_state || {}), board: [] } },
+      });
+    } catch {
+      refetchBoard();
+      addToast('Could not clear board');
+    }
+  }, [isHost, gameId, refetchBoard]);
+
+  // ── DnD sensors + handlers ─────────────────────────────────────────
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  );
+
+  const handleDragStart = useCallback((event) => {
+    setActiveDragCard(event.active.data.current?.card || null);
+  }, []);
+
+  const handleDragEnd = useCallback((event) => {
+    const { active, over, delta } = event;
+    setActiveDragCard(null);
+    if (!over) return;
+    const dragType = active.data.current?.type;
+    const card = active.data.current?.card;
+    if (!card) return;
+
+    if (dragType === 'hand-card' && over.id === 'game-board') {
+      const translated = event.active.rect.current.translated;
+      const x = (translated.left - over.rect.left) / boardScale;
+      const y = (translated.top - over.rect.top) / boardScale;
+      handleCardDroppedOnBoard(card, x, y);
+    } else if (dragType === 'board-card') {
+      const existing = boardCards.find((c) => c.hand_id === card.hand_id);
+      if (!existing) return;
+      handleBoardCardRepositioned(card, existing.x + delta.x / boardScale, existing.y + delta.y / boardScale);
+    }
+  }, [boardScale, boardCards, handleCardDroppedOnBoard, handleBoardCardRepositioned]);
+
   if (!game) {
     return (
       <div className="h-screen w-screen bg-slate-900 flex items-center justify-center">
@@ -246,6 +375,7 @@ export default function GamePage() {
   }
 
   return (
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
     <div className="h-screen w-screen bg-slate-900 overflow-hidden flex flex-col select-none">
 
       {/* ── Top strip: players + game code ── */}
@@ -261,6 +391,12 @@ export default function GamePage() {
           ))}
         </div>
         <div className="flex items-center gap-2 ml-2 flex-none">
+          <button
+            onClick={() => setShowBoard((v) => !v)}
+            className="md:hidden text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded"
+          >
+            {showBoard ? 'Piles' : 'Board'}
+          </button>
           <span className="text-xs text-slate-500 font-mono tracking-wider">{game.game_code}</span>
           <button
             onClick={() => navigate('/home')}
@@ -272,8 +408,23 @@ export default function GamePage() {
         </div>
       </div>
 
-      {/* ── Middle: piles + actions ── */}
+      {/* ── Middle: board + piles + actions ── */}
       <div className="flex-1 flex min-h-0">
+
+        {/* Board panel: always visible on md+, toggle-controlled on mobile */}
+        <div className={`${showBoard ? 'flex' : 'hidden'} md:flex flex-1 min-h-0`}>
+          <GameBoard
+            boardCards={boardCards}
+            isHost={isHost}
+            onClearBoard={handleClearBoard}
+            scale={boardScale}
+            onScaleChange={setBoardScale}
+            className="flex-1"
+          />
+        </div>
+
+        {/* Piles + actions: hidden on mobile when board shown */}
+        <div className={`${showBoard ? 'hidden' : 'flex'} md:flex flex-1 md:flex-none min-h-0`}>
 
         {/* Centre: discard + draw */}
         <div className="flex-1 flex items-center justify-center gap-6">
@@ -288,7 +439,7 @@ export default function GamePage() {
         </div>
 
         {/* Right panel: actions */}
-        <div className="w-32 flex-none flex flex-col justify-center gap-2 pr-3 py-3">
+        <div className="w-28 flex-none flex flex-col justify-start overflow-y-auto gap-1 pr-2 py-2">
           {isMyTurn ? (
             <>
               <ActionBtn
@@ -330,7 +481,7 @@ export default function GamePage() {
             </div>
           )}
 
-          <div className="border-t border-slate-700 my-1" />
+          <div className="border-t border-slate-700 mt-0.5 mb-0.5" />
           <ActionBtn label="Scores" onClick={() => setShowScoreboard(true)} color="slate" />
 
           {isHost && (
@@ -341,7 +492,8 @@ export default function GamePage() {
             </>
           )}
         </div>
-      </div>
+        </div>{/* end piles + actions wrapper */}
+      </div>{/* end middle */}
 
       {/* ── Bottom: hand ── */}
       <div className="flex-none border-t border-slate-700">
@@ -417,7 +569,28 @@ export default function GamePage() {
           </div>
         </div>
       )}
+
+      {/* ── DragOverlay: card preview while dragging ── */}
+      <DragOverlay>
+        {activeDragCard ? (
+          <div style={{ width: 80, opacity: 0.9, pointerEvents: 'none' }}>
+            <FlippableCard
+              cardName={activeDragCard.card_name}
+              frontText={activeDragCard.front_text}
+              frontImageUrl={activeDragCard.front_image_url}
+              backText={activeDragCard.back_text}
+              backImageUrl={activeDragCard.back_image_url}
+              attributes={activeDragCard.attributes}
+              isSelected={false}
+              isFlipped={false}
+              size="hand"
+            />
+          </div>
+        ) : null}
+      </DragOverlay>
+
     </div>
+    </DndContext>
   );
 }
 
@@ -434,7 +607,7 @@ function ActionBtn({ label, onClick, disabled = false, color = 'slate' }) {
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`w-full py-2 rounded-xl text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${colors[color]}`}
+      className={`w-full py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${colors[color]}`}
     >
       {label}
     </button>

@@ -22,6 +22,7 @@ const getAllDecks = async (req, res) => {
       `;
       params = [];
     } else {
+      // Return decks the user owns OR has been assigned via user_decks library
       query = `
         SELECT d.deck_id, d.user_id, d.deck_name, d.description, d.is_public,
                d.total_cards, d.unique_cards, d.shuffle_behaviour, d.duplicate_handling,
@@ -30,6 +31,7 @@ const getAllDecks = async (req, res) => {
         FROM decks d
         LEFT JOIN deck_cards dc ON d.deck_id = dc.deck_id
         WHERE d.user_id = $1
+           OR d.deck_id IN (SELECT deck_id FROM user_decks WHERE user_id = $1)
         GROUP BY d.deck_id
         ORDER BY d.created_at DESC
       `;
@@ -241,13 +243,23 @@ const deleteDeck = async (req, res) => {
       return res.status(404).json({ error: 'Deck not found' });
     }
 
-    if (deckResult.rows[0].user_id !== req.user.userId) {
+    if (deckResult.rows[0].user_id === req.user.userId) {
+      // User owns the deck — hard delete it
+      await db.query('DELETE FROM decks WHERE deck_id = $1', [deck_id]);
+      return res.json({ message: 'Deck deleted successfully' });
+    }
+
+    // User doesn't own it — check if it's in their library
+    const assignmentResult = await db.query(
+      'DELETE FROM user_decks WHERE user_id = $1 AND deck_id = $2 RETURNING user_deck_id',
+      [req.user.userId, deck_id]
+    );
+
+    if (assignmentResult.rows.length === 0) {
       return res.status(403).json({ error: 'Access denied. You do not own this deck.' });
     }
 
-    await db.query('DELETE FROM decks WHERE deck_id = $1', [deck_id]);
-
-    res.json({ message: 'Deck deleted successfully' });
+    res.json({ message: 'Deck removed from your library' });
   } catch (error) {
     console.error('Delete deck error:', error);
     res.status(500).json({ error: 'Internal server error' });

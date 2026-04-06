@@ -52,6 +52,15 @@ CREATE TABLE IF NOT EXISTS deck_cards (
   card_order INTEGER
 );
 
+-- User deck library (tracks decks assigned to a user's library, separate from ownership)
+CREATE TABLE IF NOT EXISTS user_decks (
+  user_deck_id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(user_id) ON DELETE CASCADE,
+  deck_id INTEGER REFERENCES decks(deck_id) ON DELETE CASCADE,
+  assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (user_id, deck_id)
+);
+
 -- Games table
 CREATE TABLE IF NOT EXISTS games (
   game_id SERIAL PRIMARY KEY,
@@ -110,6 +119,8 @@ CREATE TABLE IF NOT EXISTS session_discard_pile (
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_decks_user_id ON decks(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_decks_user_id ON user_decks(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_decks_deck_id ON user_decks(deck_id);
 CREATE INDEX IF NOT EXISTS idx_cards_created_by ON cards(created_by_user_id);
 CREATE INDEX IF NOT EXISTS idx_deck_cards_deck_id ON deck_cards(deck_id);
 CREATE INDEX IF NOT EXISTS idx_games_host_user_id ON games(host_user_id);

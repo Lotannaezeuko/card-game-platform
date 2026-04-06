@@ -9,8 +9,9 @@
     "test": "jest --verbose",
     "seed": "psql postgresql://lotannaezeuko@localhost:5432/card_game_db -f db/seed.sql",
     "seed:decks": "node db/seed-decks.js",
+    "seed:standard-deck": "node db/seed-standard-deck.js",
     "db:reset": "psql postgresql://lotannaezeuko@localhost:5432/card_game_db -f db/reset.sql",
-    "db:fresh": "npm run db:reset && npm run seed && npm run seed:decks"
+    "db:fresh": "npm run db:reset && npm run seed && npm run seed:decks && npm run seed:standard-deck"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

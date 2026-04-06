@@ -49,6 +49,18 @@ const register = async (req, res) => {
     );
 
     const user = result.rows[0];
+
+    // Auto-assign the Standard Playing Cards deck to every new user
+    const standardDeck = await db.query(
+      `SELECT deck_id FROM decks WHERE deck_name = 'Standard Playing Cards' AND is_public = true LIMIT 1`
+    );
+    if (standardDeck.rows.length > 0) {
+      await db.query(
+        'INSERT INTO user_decks (user_id, deck_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [user.user_id, standardDeck.rows[0].deck_id]
+      );
+    }
+
     const token = generateToken(user);
 
     res.status(201).json({

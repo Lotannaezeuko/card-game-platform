@@ -176,7 +176,14 @@ const createGame = async (req, res) => {
       return res.status(404).json({ error: 'Deck not found' });
     }
 
-    if (deckResult.rows[0].user_id !== req.user.userId) {
+    const ownsOrAssigned =
+      deckResult.rows[0].user_id === req.user.userId ||
+      (await db.query(
+        'SELECT 1 FROM user_decks WHERE user_id = $1 AND deck_id = $2',
+        [req.user.userId, deck_id]
+      )).rows.length > 0;
+
+    if (!ownsOrAssigned) {
       return res.status(403).json({ error: 'Access denied. You do not own this deck.' });
     }
 

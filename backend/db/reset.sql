@@ -15,6 +15,7 @@ TRUNCATE
   player_hands,
   game_players,
   games,
+  user_decks,
   deck_cards,
   cards,
   decks,

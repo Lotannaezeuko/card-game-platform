@@ -89,10 +89,12 @@ describe('register', () => {
 
   it('should register user successfully', async () => {
     db.query
-      .mockResolvedValueOnce({ rows: [] }) // no existing user
-      .mockResolvedValueOnce({
+      .mockResolvedValueOnce({ rows: [] })  // no existing user
+      .mockResolvedValueOnce({              // insert user
         rows: [{ user_id: 1, username: 'testuser', email: 'test@test.com', created_at: '2024-01-01' }],
-      });
+      })
+      .mockResolvedValueOnce({ rows: [{ deck_id: 99 }] }) // standard deck lookup
+      .mockResolvedValueOnce({});                          // user_decks insert
 
     bcrypt.hash.mockResolvedValue('hashed-password');
     jwt.sign.mockReturnValue('mock-token');
@@ -114,6 +116,51 @@ describe('register', () => {
       },
       token: 'mock-token',
     });
+  });
+
+  it('should assign Standard Playing Cards deck to new user on registration', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ user_id: 1, username: 'testuser', email: 'test@test.com', created_at: '2024-01-01' }],
+      })
+      .mockResolvedValueOnce({ rows: [{ deck_id: 99 }] })
+      .mockResolvedValueOnce({});
+
+    bcrypt.hash.mockResolvedValue('hashed-password');
+    jwt.sign.mockReturnValue('mock-token');
+
+    const req = { body: { username: 'testuser', email: 'test@test.com', password: 'password123' } };
+    const res = mockRes();
+
+    await register(req, res);
+
+    const deckLookupQuery = db.query.mock.calls[2][0];
+    expect(deckLookupQuery).toContain('Standard Playing Cards');
+
+    const userDecksInsertParams = db.query.mock.calls[3][1];
+    expect(userDecksInsertParams).toEqual([1, 99]);
+  });
+
+  it('should register successfully when Standard Playing Cards deck does not exist yet', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ user_id: 1, username: 'testuser', email: 'test@test.com', created_at: '2024-01-01' }],
+      })
+      .mockResolvedValueOnce({ rows: [] }); // no standard deck found — skip user_decks insert
+
+    bcrypt.hash.mockResolvedValue('hashed-password');
+    jwt.sign.mockReturnValue('mock-token');
+
+    const req = { body: { username: 'testuser', email: 'test@test.com', password: 'password123' } };
+    const res = mockRes();
+
+    await register(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(201);
+    // Only 3 db calls — no user_decks insert since deck wasn't found
+    expect(db.query).toHaveBeenCalledTimes(3);
   });
 
   it('should return 500 on database error', async () => {

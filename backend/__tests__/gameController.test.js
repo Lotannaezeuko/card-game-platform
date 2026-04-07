@@ -109,14 +109,15 @@ describe('getGameById', () => {
 
     db.query
       .mockResolvedValueOnce({ rows: [game] })
-      .mockResolvedValueOnce({ rows: players });
+      .mockResolvedValueOnce({ rows: players })
+      .mockResolvedValueOnce({ rows: [] }); // discard top (empty)
 
     const req = { params: { game_id: 1 }, user: { userId: 1 } };
     const res = mockRes();
 
     await getGameById(req, res);
 
-    expect(res.json).toHaveBeenCalledWith({ game, players });
+    expect(res.json).toHaveBeenCalledWith({ game, players, discard_top: null });
   });
 
   it('should return game with players for non-host player', async () => {
@@ -125,14 +126,15 @@ describe('getGameById', () => {
 
     db.query
       .mockResolvedValueOnce({ rows: [game] })
-      .mockResolvedValueOnce({ rows: players });
+      .mockResolvedValueOnce({ rows: players })
+      .mockResolvedValueOnce({ rows: [] }); // discard top (empty)
 
     const req = { params: { game_id: 1 }, user: { userId: 1 } };
     const res = mockRes();
 
     await getGameById(req, res);
 
-    expect(res.json).toHaveBeenCalledWith({ game, players });
+    expect(res.json).toHaveBeenCalledWith({ game, players, discard_top: null });
   });
 
   it('should return 500 on database error', async () => {
@@ -170,8 +172,10 @@ describe('createGame', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Deck not found' });
   });
 
-  it('should return 403 if user does not own the deck', async () => {
-    db.query.mockResolvedValue({ rows: [{ user_id: 2 }] });
+  it('should return 403 if user neither owns nor has deck in library', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ user_id: 2 }] }) // owned by someone else
+      .mockResolvedValueOnce({ rows: [] });               // not in user_decks
 
     const req = { body: { deck_id: 1 }, user: { userId: 1 } };
     const res = mockRes();
@@ -182,10 +186,28 @@ describe('createGame', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Access denied. You do not own this deck.' });
   });
 
+  it('should allow user with deck in library to create a game', async () => {
+    const game = { game_id: 1, deck_id: 1, host_user_id: 1, is_online: false, game_code: 'ABC123' };
+    db.query
+      .mockResolvedValueOnce({ rows: [{ user_id: 2 }] })  // deck owned by seed user
+      .mockResolvedValueOnce({ rows: [{ user_deck_id: 5 }] }) // but in user's library
+      .mockResolvedValueOnce({ rows: [] })                 // game_code uniqueness check
+      .mockResolvedValueOnce({ rows: [game] })             // insert game
+      .mockResolvedValueOnce({});                          // insert player
+
+    const req = { body: { deck_id: 1 }, user: { userId: 1 } };
+    const res = mockRes();
+
+    await createGame(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({ game, message: 'Game created successfully' });
+  });
+
   it('should create game with game_code and add host as player', async () => {
     const game = { game_id: 1, deck_id: 1, host_user_id: 1, is_online: false, game_code: 'ABC123' };
     db.query
-      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] }) // deck check
+      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] }) // deck owned by user
       .mockResolvedValueOnce({ rows: [] })               // game_code uniqueness check
       .mockResolvedValueOnce({ rows: [game] })           // insert game
       .mockResolvedValueOnce({});                        // insert player
@@ -293,7 +315,7 @@ describe('createGame', () => {
   it('should retry game_code generation if collision detected', async () => {
     const game = { game_id: 1, game_code: 'NEW123' };
     db.query
-      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] })     // deck check
+      .mockResolvedValueOnce({ rows: [{ user_id: 1 }] })     // deck owned by user
       .mockResolvedValueOnce({ rows: [{ game_id: 99 }] })    // first code taken
       .mockResolvedValueOnce({ rows: [] })                   // second code free
       .mockResolvedValueOnce({ rows: [game] })               // insert game

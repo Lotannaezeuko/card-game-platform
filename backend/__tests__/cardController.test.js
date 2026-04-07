@@ -34,7 +34,7 @@ describe('getAllCards', () => {
       .mockResolvedValueOnce({ rows: cards })
       .mockResolvedValueOnce({ rows: [{ count: '1' }] });
 
-    const req = { query: {} };
+    const req = { query: {}, user: { userId: 1 } };
     const res = mockRes();
 
     await getAllCards(req, res);
@@ -50,7 +50,7 @@ describe('getAllCards', () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ count: '0' }] });
 
-    const req = { query: { limit: '10', offset: '20' } };
+    const req = { query: { limit: '10', offset: '20' }, user: { userId: 1 } };
     const res = mockRes();
 
     await getAllCards(req, res);
@@ -66,7 +66,7 @@ describe('getAllCards', () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ count: '0' }] });
 
-    const req = { query: { limit: '500' } };
+    const req = { query: { limit: '500' }, user: { userId: 1 } };
     const res = mockRes();
 
     await getAllCards(req, res);
@@ -77,19 +77,19 @@ describe('getAllCards', () => {
     });
   });
 
-  it('should filter by created_by', async () => {
+  it('should filter by created_by (always uses authenticated user id)', async () => {
     db.query
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ count: '0' }] });
 
-    const req = { query: { created_by: '1' } };
+    const req = { query: { created_by: '1' }, user: { userId: 1 } };
     const res = mockRes();
 
     await getAllCards(req, res);
 
     expect(db.query).toHaveBeenCalledTimes(2);
     const firstCallParams = db.query.mock.calls[0][1];
-    expect(firstCallParams).toContain('1');
+    expect(firstCallParams).toContain(1);
   });
 
   it('should return 500 on database error', async () => {

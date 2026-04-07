@@ -127,8 +127,9 @@ describe('drawCard', () => {
 
   it('should return 404 if draw pile is empty', async () => {
     db.query
-      .mockResolvedValueOnce({ rows: [{ game_player_id: 1 }] })
-      .mockResolvedValueOnce({ rows: [] });
+      .mockResolvedValueOnce({ rows: [{ player_position: 1 }] })                          // player check
+      .mockResolvedValueOnce({ rows: [{ current_player_position: 1, game_code: 'X' }] }) // game/turn check
+      .mockResolvedValueOnce({ rows: [] });                                                // empty draw pile
 
     const req = { params: { game_id: 1 }, user: { userId: 1 } };
     const res = mockRes();
@@ -142,10 +143,11 @@ describe('drawCard', () => {
   it('should draw a card and add it to player hand', async () => {
     const handEntry = { hand_id: 5, game_id: 1, user_id: 1, card_id: 10 };
     db.query
-      .mockResolvedValueOnce({ rows: [{ game_player_id: 1 }] })
-      .mockResolvedValueOnce({ rows: [{ pile_id: 3, card_id: 10 }] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [handEntry] });
+      .mockResolvedValueOnce({ rows: [{ player_position: 1 }] })                                    // player check
+      .mockResolvedValueOnce({ rows: [{ current_player_position: 1, game_code: 'ABC123' }] })       // game/turn check
+      .mockResolvedValueOnce({ rows: [{ pile_id: 3, card_id: 10 }] })                               // draw pile
+      .mockResolvedValueOnce({ rows: [] })                                                           // update is_drawn
+      .mockResolvedValueOnce({ rows: [handEntry] });                                                 // insert hand
 
     const req = { params: { game_id: 1 }, user: { userId: 1 } };
     const res = mockRes();
@@ -155,7 +157,7 @@ describe('drawCard', () => {
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith({ hand_entry: handEntry });
 
-    const updateCall = db.query.mock.calls[2];
+    const updateCall = db.query.mock.calls[3];
     expect(updateCall[0]).toContain('is_drawn = true');
     expect(updateCall[1]).toContain(3);
   });
@@ -184,7 +186,10 @@ describe('playCard', () => {
   });
 
   it('should return 404 if card not in player hand', async () => {
-    db.query.mockResolvedValue({ rows: [] });
+    db.query
+      .mockResolvedValueOnce({ rows: [{ player_position: 1 }] })                          // player check
+      .mockResolvedValueOnce({ rows: [{ current_player_position: 1, game_code: 'X' }] }) // game/turn check
+      .mockResolvedValueOnce({ rows: [] });                                                // hand query empty → 404
 
     const req = { params: { game_id: 1 }, body: { hand_id: 99 }, user: { userId: 1 } };
     const res = mockRes();
@@ -198,9 +203,11 @@ describe('playCard', () => {
   it('should play a card and add it to discard pile', async () => {
     const discardEntry = { discard_id: 1, game_id: 1, card_id: 10, discarded_by: 1 };
     db.query
-      .mockResolvedValueOnce({ rows: [{ card_id: 10 }] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [discardEntry] });
+      .mockResolvedValueOnce({ rows: [{ player_position: 1 }] })                                    // player check
+      .mockResolvedValueOnce({ rows: [{ current_player_position: 1, game_code: 'ABC123' }] })       // game/turn check
+      .mockResolvedValueOnce({ rows: [{ card_id: 10, card_name: 'Test', front_text: 'X', front_image_url: null, attributes: {} }] }) // hand query
+      .mockResolvedValueOnce({ rows: [] })                                                           // DELETE player_hands
+      .mockResolvedValueOnce({ rows: [discardEntry] });                                              // INSERT discard
 
     const req = { params: { game_id: 1 }, body: { hand_id: 5 }, user: { userId: 1 } };
     const res = mockRes();
@@ -209,7 +216,7 @@ describe('playCard', () => {
 
     expect(res.json).toHaveBeenCalledWith({ discard_entry: discardEntry });
 
-    const deleteCall = db.query.mock.calls[1];
+    const deleteCall = db.query.mock.calls[3];
     expect(deleteCall[0]).toContain('DELETE FROM player_hands');
     expect(deleteCall[1]).toContain(5);
   });
@@ -241,8 +248,9 @@ describe('passTurn', () => {
 
   it('should return 400 if no players in the game', async () => {
     db.query
-      .mockResolvedValueOnce({ rows: [{ current_player_position: 1, turn_direction: 'clockwise' }] })
-      .mockResolvedValueOnce({ rows: [{ player_count: '0' }] });
+      .mockResolvedValueOnce({ rows: [{ current_player_position: 1, turn_direction: 'clockwise', game_code: 'X' }] }) // game
+      .mockResolvedValueOnce({ rows: [{ player_position: 1 }] })                                                      // player check (matches → passes turn check)
+      .mockResolvedValueOnce({ rows: [{ player_count: '0' }] });                                                      // count → 400
 
     const req = { params: { game_id: 1 }, user: { userId: 1 } };
     const res = mockRes();
@@ -256,7 +264,8 @@ describe('passTurn', () => {
   it('should advance turn clockwise', async () => {
     const updatedGame = { game_id: 1, current_player_position: 2, turn_direction: 'clockwise' };
     db.query
-      .mockResolvedValueOnce({ rows: [{ current_player_position: 1, turn_direction: 'clockwise' }] })
+      .mockResolvedValueOnce({ rows: [{ current_player_position: 1, turn_direction: 'clockwise', game_code: 'X' }] })
+      .mockResolvedValueOnce({ rows: [{ player_position: 1 }] }) // player check matches position 1
       .mockResolvedValueOnce({ rows: [{ player_count: '3' }] })
       .mockResolvedValueOnce({ rows: [updatedGame] });
 
@@ -266,14 +275,15 @@ describe('passTurn', () => {
     await passTurn(req, res);
 
     expect(res.json).toHaveBeenCalledWith({ game: updatedGame });
-    const updateParams = db.query.mock.calls[2][1];
+    const updateParams = db.query.mock.calls[3][1];
     expect(updateParams[0]).toBe(2);
   });
 
   it('should wrap around clockwise at end', async () => {
     const updatedGame = { game_id: 1, current_player_position: 1, turn_direction: 'clockwise' };
     db.query
-      .mockResolvedValueOnce({ rows: [{ current_player_position: 3, turn_direction: 'clockwise' }] })
+      .mockResolvedValueOnce({ rows: [{ current_player_position: 3, turn_direction: 'clockwise', game_code: 'X' }] })
+      .mockResolvedValueOnce({ rows: [{ player_position: 3 }] }) // player check matches position 3
       .mockResolvedValueOnce({ rows: [{ player_count: '3' }] })
       .mockResolvedValueOnce({ rows: [updatedGame] });
 
@@ -282,14 +292,15 @@ describe('passTurn', () => {
 
     await passTurn(req, res);
 
-    const updateParams = db.query.mock.calls[2][1];
+    const updateParams = db.query.mock.calls[3][1];
     expect(updateParams[0]).toBe(1);
   });
 
   it('should advance turn counterclockwise', async () => {
     const updatedGame = { game_id: 1, current_player_position: 1, turn_direction: 'counterclockwise' };
     db.query
-      .mockResolvedValueOnce({ rows: [{ current_player_position: 2, turn_direction: 'counterclockwise' }] })
+      .mockResolvedValueOnce({ rows: [{ current_player_position: 2, turn_direction: 'counterclockwise', game_code: 'X' }] })
+      .mockResolvedValueOnce({ rows: [{ player_position: 2 }] }) // player check matches position 2
       .mockResolvedValueOnce({ rows: [{ player_count: '3' }] })
       .mockResolvedValueOnce({ rows: [updatedGame] });
 
@@ -298,13 +309,14 @@ describe('passTurn', () => {
 
     await passTurn(req, res);
 
-    const updateParams = db.query.mock.calls[2][1];
+    const updateParams = db.query.mock.calls[3][1];
     expect(updateParams[0]).toBe(1);
   });
 
   it('should wrap around counterclockwise at start', async () => {
     db.query
-      .mockResolvedValueOnce({ rows: [{ current_player_position: 1, turn_direction: 'counterclockwise' }] })
+      .mockResolvedValueOnce({ rows: [{ current_player_position: 1, turn_direction: 'counterclockwise', game_code: 'X' }] })
+      .mockResolvedValueOnce({ rows: [{ player_position: 1 }] }) // player check matches position 1
       .mockResolvedValueOnce({ rows: [{ player_count: '3' }] })
       .mockResolvedValueOnce({ rows: [{ current_player_position: 3 }] });
 
@@ -313,7 +325,7 @@ describe('passTurn', () => {
 
     await passTurn(req, res);
 
-    const updateParams = db.query.mock.calls[2][1];
+    const updateParams = db.query.mock.calls[3][1];
     expect(updateParams[0]).toBe(3);
   });
 
@@ -331,7 +343,9 @@ describe('passTurn', () => {
 
 describe('reshuffleDeck', () => {
   it('should return message if discard pile is empty', async () => {
-    db.query.mockResolvedValueOnce({ rows: [] });
+    db.query
+      .mockResolvedValueOnce({ rows: [{ host_user_id: 1, game_code: 'ABC123' }] }) // game/host check
+      .mockResolvedValueOnce({ rows: [] });                                         // empty discard pile
 
     const req = { params: { game_id: 1 }, user: { userId: 1 } };
     const res = mockRes();
@@ -344,10 +358,11 @@ describe('reshuffleDeck', () => {
   it('should reshuffle discard pile into draw pile', async () => {
     const discardCards = [{ card_id: 10 }, { card_id: 20 }, { card_id: 30 }];
     db.query
-      .mockResolvedValueOnce({ rows: discardCards })
-      .mockResolvedValueOnce({ rows: [{ max_order: '5' }] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValue({ rows: [] });
+      .mockResolvedValueOnce({ rows: [{ host_user_id: 1, game_code: 'ABC123' }] }) // game/host check
+      .mockResolvedValueOnce({ rows: discardCards })                                // discard pile
+      .mockResolvedValueOnce({ rows: [{ max_order: '5' }] })                       // max draw pile order
+      .mockResolvedValueOnce({ rows: [] })                                          // DELETE discard
+      .mockResolvedValue({ rows: [] });                                             // INSERT inserts
 
     const req = { params: { game_id: 1 }, user: { userId: 1 } };
     const res = mockRes();
@@ -397,7 +412,9 @@ describe('updateScore', () => {
   });
 
   it('should return 404 if player not in game', async () => {
-    db.query.mockResolvedValue({ rows: [] });
+    db.query
+      .mockResolvedValueOnce({ rows: [{ host_user_id: 1, game_code: 'X' }] }) // game/host check passes
+      .mockResolvedValueOnce({ rows: [] });                                    // UPDATE returns empty → player not found
 
     const req = { params: { game_id: 1 }, body: { user_id: 99, score: 10 }, user: { userId: 1 } };
     const res = mockRes();
@@ -410,7 +427,10 @@ describe('updateScore', () => {
 
   it('should update score successfully', async () => {
     const updatedPlayer = { game_player_id: 1, user_id: 2, score: 15 };
-    db.query.mockResolvedValue({ rows: [updatedPlayer] });
+    db.query
+      .mockResolvedValueOnce({ rows: [{ host_user_id: 1, game_code: 'ABC123' }] }) // game/host check
+      .mockResolvedValueOnce({ rows: [updatedPlayer] })                             // UPDATE game_players
+      .mockResolvedValueOnce({ rows: [{ username: 'player2' }] });                 // username lookup
 
     const req = { params: { game_id: 1 }, body: { user_id: 2, score: 15 }, user: { userId: 1 } };
     const res = mockRes();
@@ -418,7 +438,7 @@ describe('updateScore', () => {
     await updateScore(req, res);
 
     expect(res.json).toHaveBeenCalledWith({ player: updatedPlayer });
-    const updateParams = db.query.mock.calls[0][1];
+    const updateParams = db.query.mock.calls[1][1];
     expect(updateParams[0]).toBe(15);
     expect(updateParams[1]).toBe(1);
     expect(updateParams[2]).toBe(2);

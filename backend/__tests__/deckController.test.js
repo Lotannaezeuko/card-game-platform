@@ -69,6 +69,18 @@ describe('getAllDecks', () => {
     expect(queryStr).toContain('unique_cards');
   });
 
+  it('should include user_decks library decks in the private query', async () => {
+    db.query.mockResolvedValue({ rows: [] });
+
+    const req = { query: {}, user: { userId: 1 } };
+    const res = mockRes();
+
+    await getAllDecks(req, res);
+
+    const queryStr = db.query.mock.calls[0][0];
+    expect(queryStr).toContain('user_decks');
+  });
+
   it('should return 500 on database error', async () => {
     db.query.mockRejectedValue(new Error('DB error'));
 
@@ -421,8 +433,10 @@ describe('deleteDeck', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Deck not found' });
   });
 
-  it('should return 403 if user does not own the deck', async () => {
-    db.query.mockResolvedValue({ rows: [{ user_id: 2 }] });
+  it('should return 403 if user neither owns nor has deck in library', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ user_id: 2 }] }) // deck owned by someone else
+      .mockResolvedValueOnce({ rows: [] });               // not in user_decks either
 
     const req = { params: { deck_id: 1 }, user: { userId: 1 } };
     const res = mockRes();
@@ -433,7 +447,7 @@ describe('deleteDeck', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Access denied. You do not own this deck.' });
   });
 
-  it('should delete deck successfully', async () => {
+  it('should delete deck successfully when user owns it', async () => {
     db.query
       .mockResolvedValueOnce({ rows: [{ user_id: 1 }] })
       .mockResolvedValueOnce({});
@@ -444,6 +458,19 @@ describe('deleteDeck', () => {
     await deleteDeck(req, res);
 
     expect(res.json).toHaveBeenCalledWith({ message: 'Deck deleted successfully' });
+  });
+
+  it('should remove assigned deck from library when user does not own it', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ user_id: 2 }] })              // owned by someone else
+      .mockResolvedValueOnce({ rows: [{ user_deck_id: 5 }] });        // found in user_decks
+
+    const req = { params: { deck_id: 1 }, user: { userId: 1 } };
+    const res = mockRes();
+
+    await deleteDeck(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({ message: 'Deck removed from your library' });
   });
 
   it('should return 500 on database error', async () => {

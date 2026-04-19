@@ -12,6 +12,7 @@ const deckRoutes = require('./routes/decks');
 const cardRoutes = require('./routes/cards');
 const gameRoutes = require('./routes/games');
 const uploadRoutes = require('./routes/upload');
+const { authenticateToken } = require('./middleware/auth');
 
 const app = express();
 const server = http.createServer(app);
@@ -47,8 +48,11 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Static uploads
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Authenticated uploads — requires a valid JWT to access any uploaded file
+app.get('/uploads/:filename', authenticateToken, (req, res) => {
+  const safeName = path.basename(req.params.filename);
+  res.sendFile(path.join(__dirname, '../uploads', safeName));
+});
 
 // Routes
 app.use('/api/auth', authRoutes);

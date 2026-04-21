@@ -132,7 +132,7 @@ export default function GameSetupPage() {
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setHandSize((v) => Math.max(1, v - 1))}
+                  onClick={() => setHandSize((v) => Math.max(0, v - 1))}
                   className="w-10 h-10 rounded-full border border-gray-300 text-lg font-bold text-gray-600 flex items-center justify-center"
                 >−</button>
                 <div className="flex-1 h-2 bg-gray-200 rounded-full">

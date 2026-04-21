@@ -51,13 +51,29 @@ const register = async (req, res) => {
     const user = result.rows[0];
 
     // Auto-assign the Standard Playing Cards deck to every new user
+    // and copy all 52 cards into their personal card library
     const standardDeck = await db.query(
       `SELECT deck_id FROM decks WHERE deck_name = 'Standard Playing Cards' AND is_public = true LIMIT 1`
     );
     if (standardDeck.rows.length > 0) {
+      const deckId = standardDeck.rows[0].deck_id;
+
       await db.query(
         'INSERT INTO user_decks (user_id, deck_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [user.user_id, standardDeck.rows[0].deck_id]
+        [user.user_id, deckId]
+      );
+
+      // Copy each card in the standard deck into the new user's card library
+      await db.query(
+        `INSERT INTO cards
+           (created_by_user_id, card_name, front_text, front_image_url,
+            back_text, back_image_url, default_copies, is_unique, attributes)
+         SELECT $1, c.card_name, c.front_text, c.front_image_url,
+                c.back_text, c.back_image_url, c.default_copies, c.is_unique, c.attributes
+         FROM deck_cards dc
+         JOIN cards c ON c.card_id = dc.card_id
+         WHERE dc.deck_id = $2`,
+        [user.user_id, deckId]
       );
     }
 

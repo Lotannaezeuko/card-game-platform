@@ -39,6 +39,11 @@ const emitScoreUpdated = (io, game_code, data) => {
   io.to(game_code).emit('score_updated', data);
 };
 
+const emitBoardCardPlaced = (io, game_code, data) => {
+  // data: { user_id, username, card_name } — name only, not full card (board is visible to all)
+  io.to(game_code).emit('board_card_placed', data);
+};
+
 const emitGameEnded = (io, game_code, data) => {
   // data: { ended_at, scores: [{ user_id, username, score, player_position }] }
   io.to(game_code).emit('game_ended', data);
@@ -58,6 +63,7 @@ module.exports = {
   emitGameStarted,
   emitCardDrawn,
   emitCardPlayed,
+  emitBoardCardPlaced,
   emitTurnPassed,
   emitReshuffle,
   emitScoreUpdated,

@@ -208,7 +208,7 @@ const createGame = async (req, res) => {
         req.user.userId,
         game_code,
         is_online || false,
-        starting_hand_size || 5,
+        starting_hand_size ?? 5,
         turn_direction || 'clockwise',
         deal_method || 'full_hand_at_start',
       ]

@@ -202,23 +202,49 @@ async function seedStandardDeck(userId) {
     console.log(`    Confirmed ${countResult.rows[0].count} cards in deck`);
   }
 
-  // Backfill — assign deck to all existing users who don't already have it
-  // The seed user owns the deck so they don't need a user_decks row
+  // Backfill — assign deck and copy cards to all existing users who don't already have it
+  // The seed user owns the deck so they don't need a user_decks row or card copies
   const allUsers = await db.query(
     'SELECT user_id FROM users WHERE user_id != $1',
     [userId]
   );
 
   let assigned = 0;
+  let cardsCopied = 0;
   for (const row of allUsers.rows) {
     const insertResult = await db.query(
       'INSERT INTO user_decks (user_id, deck_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING user_deck_id',
       [row.user_id, deckId]
     );
     if (insertResult.rows.length > 0) assigned++;
+
+    // Copy the 52 cards into this user's personal card library if they don't have them yet
+    const alreadyHasCards = await db.query(
+      `SELECT 1 FROM cards c
+       JOIN deck_cards dc ON dc.card_id = c.card_id
+       WHERE dc.deck_id = $1 AND c.created_by_user_id = $2
+       LIMIT 1`,
+      [deckId, row.user_id]
+    );
+
+    if (alreadyHasCards.rows.length === 0) {
+      await db.query(
+        `INSERT INTO cards
+           (created_by_user_id, card_name, front_text, front_image_url,
+            back_text, back_image_url, default_copies, is_unique, attributes)
+         SELECT $1, c.card_name, c.front_text, c.front_image_url,
+                c.back_text, c.back_image_url, c.default_copies, c.is_unique, c.attributes
+         FROM deck_cards dc
+         JOIN cards c ON c.card_id = dc.card_id
+         WHERE dc.deck_id = $2`,
+        [row.user_id, deckId]
+      );
+      cardsCopied++;
+    }
   }
 
   console.log(`  Assigned to ${assigned} existing user(s) (${allUsers.rows.length - assigned} already had it)`);
+  console.log(`  Copied 52 cards to ${cardsCopied} user(s)`);
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ const {
   emitGameStarted,
   emitCardDrawn,
   emitCardPlayed,
+  emitBoardCardPlaced,
   emitTurnPassed,
   emitReshuffle,
   emitScoreUpdated,
@@ -519,11 +520,67 @@ const endSession = async (req, res) => {
   }
 };
 
+const placeCardOnBoard = async (req, res) => {
+  try {
+    const { game_id } = req.params;
+    const { hand_id, board } = req.body;
+
+    if (!hand_id || !Array.isArray(board)) {
+      return res.status(400).json({ error: 'hand_id and board array are required' });
+    }
+
+    // Verify game exists and is active
+    const gameResult = await db.query(
+      'SELECT game_code, game_state, status FROM games WHERE game_id = $1',
+      [game_id]
+    );
+    if (gameResult.rows.length === 0) return res.status(404).json({ error: 'Game not found' });
+    const game = gameResult.rows[0];
+    if (game.status !== 'active') return res.status(400).json({ error: 'Game is not active' });
+
+    // Verify card belongs to this player's hand
+    const handCheck = await db.query(
+      `SELECT ph.hand_id, c.card_id, c.card_name
+       FROM player_hands ph
+       JOIN cards c ON c.card_id = ph.card_id
+       WHERE ph.hand_id = $1 AND ph.game_id = $2 AND ph.user_id IS NOT DISTINCT FROM $3`,
+      [hand_id, game_id, req.user.userId]
+    );
+    if (handCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Card not found in your hand' });
+    }
+    const { card_name } = handCheck.rows[0];
+
+    // Remove card from player_hands
+    await db.query('DELETE FROM player_hands WHERE hand_id = $1', [hand_id]);
+
+    // Persist the updated board in game_state
+    const existingState = game.game_state || {};
+    await db.query(
+      'UPDATE games SET game_state = $1 WHERE game_id = $2',
+      [JSON.stringify({ ...existingState, board }), game_id]
+    );
+
+    // Notify all players
+    emitBoardCardPlaced(req.app.get('io'), game.game_code, {
+      user_id: req.user.userId,
+      username: req.user.username,
+      card_name,
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('placeCardOnBoard error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   getPlayerHand,
   dealStartingHand,
   drawCard,
   playCard,
+  placeCardOnBoard,
   passTurn,
   reshuffleDeck,
   updateScore,

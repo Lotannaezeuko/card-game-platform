@@ -117,6 +117,14 @@ export default function GamePage() {
       if (user_id !== userRef.current?.userId) addToast(`${username} drew a card`);
     });
 
+    socket.on('board_card_placed', ({ user_id, username, card_name }) => {
+      if (user_id !== userRef.current?.userId) {
+        setBoardCards([]); // will resync on next refetchBoard
+        refetchBoardRef.current();
+        addToast(`${username} placed ${card_name} on the board`);
+      }
+    });
+
     socket.on('card_played', ({ user_id, username, card }) => {
       setDiscardTop(card);
       if (user_id !== userRef.current?.userId) {
@@ -156,6 +164,7 @@ export default function GamePage() {
 
     return () => {
       socket.emit('leave_game', { game_code: game.game_code });
+      socket.off('board_card_placed');
       socket.off('card_drawn');
       socket.off('card_played');
       socket.off('turn_passed');
@@ -290,20 +299,18 @@ export default function GamePage() {
     setBoardCards(newBoard);
     setHand((prev) => prev.filter((c) => c.hand_id !== card.hand_id));
     try {
-      await apiFetch(`/games/${gameId}/play`, { method: 'POST', body: { hand_id: card.hand_id } });
-      const currentGame = await apiFetch(`/games/${gameId}`);
-      await apiFetch(`/games/${gameId}/state`, {
-        method: 'PUT',
-        body: { game_state: { ...(currentGame.game.game_state || {}), board: newBoard } },
+      // Use the dedicated board endpoint — removes card from player_hands without
+      // touching session_discard_pile, and emits board_card_placed to all players
+      await apiFetch(`/games/${gameId}/board`, {
+        method: 'POST',
+        body: { hand_id: card.hand_id, board: newBoard },
       });
-      // Fix discardTop incorrectly set by the card_played socket event
-      await refetchBoard();
     } catch (err) {
       setBoardCards((prev) => prev.filter((c) => c.hand_id !== card.hand_id));
       setHand((prev) => [...prev, card]);
       addToast(err.message || 'Could not place card on board');
     }
-  }, [boardCards, gameId, user, refetchBoard]);
+  }, [boardCards, gameId, user]);
 
   const handleBoardCardRepositioned = useCallback(async (card, newX, newY) => {
     const newBoard = boardCards.map((c) =>
@@ -393,7 +400,7 @@ export default function GamePage() {
         <div className="flex items-center gap-2 ml-2 flex-none">
           <button
             onClick={() => setShowBoard((v) => !v)}
-            className="md:hidden text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded"
+            className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded"
           >
             {showBoard ? 'Piles' : 'Board'}
           </button>
@@ -411,8 +418,8 @@ export default function GamePage() {
       {/* ── Middle: board + piles + actions ── */}
       <div className="flex-1 flex min-h-0">
 
-        {/* Board panel: always visible on md+, toggle-controlled on mobile */}
-        <div className={`${showBoard ? 'flex' : 'hidden'} md:flex flex-1 min-h-0`}>
+        {/* Board panel: toggle-controlled on all screen sizes */}
+        <div className={`${showBoard ? 'flex' : 'hidden'} flex-1 min-h-0`}>
           <GameBoard
             boardCards={boardCards}
             isHost={isHost}
@@ -423,8 +430,8 @@ export default function GamePage() {
           />
         </div>
 
-        {/* Piles + actions: hidden on mobile when board shown */}
-        <div className={`${showBoard ? 'hidden' : 'flex'} md:flex flex-1 md:flex-none min-h-0`}>
+        {/* Piles + actions: hidden when board shown */}
+        <div className={`${showBoard ? 'hidden' : 'flex'} flex-1 min-h-0`}>
 
         {/* Centre: discard + draw */}
         <div className="flex-1 flex items-center justify-center gap-6">

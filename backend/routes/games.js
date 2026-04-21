@@ -19,6 +19,7 @@ router.get('/:game_id/hand', authenticateToken, gameActionsController.getPlayerH
 router.post('/:game_id/deal', authenticateToken, gameActionsController.dealStartingHand);
 router.post('/:game_id/draw', authenticateToken, gameActionsController.drawCard);
 router.post('/:game_id/play', authenticateToken, gameActionsController.playCard);
+router.post('/:game_id/board', authenticateToken, gameActionsController.placeCardOnBoard);
 router.post('/:game_id/pass', authenticateToken, gameActionsController.passTurn);
 router.post('/:game_id/reshuffle', authenticateToken, gameActionsController.reshuffleDeck);
 router.put('/:game_id/score', authenticateToken, gameActionsController.updateScore);

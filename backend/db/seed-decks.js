@@ -191,7 +191,40 @@ const DECKS = [
     })),
   },
 
-  // ─── Deck 3: World Capitals Flashcards ──────────────────────────────────────
+  // ─── Deck 3: Animal Charades ────────────────────────────────────────────────
+  {
+    meta: {
+      deck_name: 'Animal Charades',
+      description: 'Act out the animal on your card without making a sound. Can your team guess it in 60 seconds?',
+      shuffle_behaviour: 'shuffle_before_game',
+      duplicate_handling: 'no_duplicates',
+      total_cards: 50,
+      unique_cards: 50,
+      is_public: true,
+    },
+    assignToAll: true,
+    cards: [
+      'Elephant', 'Giraffe', 'Lion', 'Penguin', 'Kangaroo',
+      'Monkey', 'Snake', 'Crocodile', 'Parrot', 'Flamingo',
+      'Crab', 'Octopus', 'Shark', 'Dolphin', 'Whale',
+      'Gorilla', 'Cheetah', 'Sloth', 'Koala', 'Panda',
+      'Zebra', 'Peacock', 'Eagle', 'Owl', 'Frog',
+      'Butterfly', 'Spider', 'Bee', 'Turtle', 'Bear',
+      'Wolf', 'Fox', 'Deer', 'Bat', 'Rooster',
+      'Chameleon', 'Meerkat', 'Raccoon', 'Walrus', 'Seal',
+      'Camel', 'Porcupine', 'Hedgehog', 'Platypus', 'Duck',
+      'Horse', 'Rabbit', 'Cat', 'Dog', 'Gorilla',
+    ].filter((v, i, a) => a.indexOf(v) === i).map((animal) => ({
+      card_name: animal,
+      front_text: animal,
+      back_text: 'Act out this animal without speaking, making sounds, or mouthing words. Your team has 60 seconds to guess.',
+      default_copies: 1,
+      is_unique: true,
+      attributes: { category: 'animal' },
+    })),
+  },
+
+  // ─── Deck 4: World Capitals Flashcards ──────────────────────────────────────
   {
     meta: {
       deck_name: 'World Capitals Flashcards',
@@ -304,7 +337,7 @@ async function seedDeck(userId, deckMeta, cardDefs) {
 
   if (existingDeck.rows.length > 0) {
     console.log(`  Deck ${deckLabel} already exists — skipping`);
-    return;
+    return existingDeck.rows[0].deck_id;
   }
 
   // Find or create all cards
@@ -353,6 +386,7 @@ async function seedDeck(userId, deckMeta, cardDefs) {
     `    ${cardEntries.length} card types — ${cardsCreated} created, ${cardsReused} reused`
   );
   console.log(`    ${cardEntries.length} deck_cards entries`);
+  return deckId;
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -365,8 +399,48 @@ async function main() {
     const userId = await findOrCreateUser();
 
     console.log('\nDecks:');
-    for (const { meta, cards } of DECKS) {
-      await seedDeck(userId, meta, cards);
+    for (const { meta, cards, assignToAll } of DECKS) {
+      const deckId = await seedDeck(userId, meta, cards);
+
+      if (assignToAll && deckId) {
+        const allUsers = await db.query(
+          'SELECT user_id FROM users WHERE user_id != $1',
+          [userId]
+        );
+
+        let assigned = 0;
+        let cardsCopied = 0;
+        for (const row of allUsers.rows) {
+          const insertResult = await db.query(
+            'INSERT INTO user_decks (user_id, deck_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING user_deck_id',
+            [row.user_id, deckId]
+          );
+          if (insertResult.rows.length > 0) assigned++;
+
+          const alreadyHasCards = await db.query(
+            `SELECT 1 FROM cards c
+             JOIN deck_cards dc ON dc.card_id = c.card_id
+             WHERE dc.deck_id = $1 AND c.created_by_user_id = $2
+             LIMIT 1`,
+            [deckId, row.user_id]
+          );
+          if (alreadyHasCards.rows.length === 0) {
+            await db.query(
+              `INSERT INTO cards
+                 (created_by_user_id, card_name, front_text, back_text,
+                  default_copies, is_unique, attributes)
+               SELECT $1, c.card_name, c.front_text, c.back_text,
+                      c.default_copies, c.is_unique, c.attributes
+               FROM deck_cards dc
+               JOIN cards c ON c.card_id = dc.card_id
+               WHERE dc.deck_id = $2`,
+              [row.user_id, deckId]
+            );
+            cardsCopied++;
+          }
+        }
+        console.log(`    Backfilled ${assigned} user_decks, copied cards to ${cardsCopied} user(s)`);
+      }
     }
 
     console.log('\nDone.\n');

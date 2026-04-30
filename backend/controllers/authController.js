@@ -50,20 +50,17 @@ const register = async (req, res) => {
 
     const user = result.rows[0];
 
-    // Auto-assign the Standard Playing Cards deck to every new user
-    // and copy all 52 cards into their personal card library
-    const standardDeck = await db.query(
-      `SELECT deck_id FROM decks WHERE deck_name = 'Standard Playing Cards' AND is_public = true LIMIT 1`
+    // Auto-assign starter decks to every new user and copy cards into their library
+    const starterDecks = await db.query(
+      `SELECT deck_id FROM decks
+       WHERE deck_name IN ('Standard Playing Cards', 'Animal Charades')
+       AND is_public = true`
     );
-    if (standardDeck.rows.length > 0) {
-      const deckId = standardDeck.rows[0].deck_id;
-
+    for (const { deck_id: deckId } of starterDecks.rows) {
       await db.query(
         'INSERT INTO user_decks (user_id, deck_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
         [user.user_id, deckId]
       );
-
-      // Copy each card in the standard deck into the new user's card library
       await db.query(
         `INSERT INTO cards
            (created_by_user_id, card_name, front_text, front_image_url,

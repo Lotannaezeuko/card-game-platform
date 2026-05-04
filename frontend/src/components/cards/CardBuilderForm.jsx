@@ -32,21 +32,19 @@ const STOCK_PATTERNS = [
   { label: 'Chevron',          value: 'chevron' },
 ];
 
-// Derive the back style mode from saved attributes
+// Reads saved attributes to determine which back style tab should be active on load
 function deriveBackStyle(attributes) {
   if (attributes?.backColour) return 'colour';
   if (attributes?.backPattern) return 'pattern';
   return 'custom';
 }
 
-/**
- * Self-contained card builder form.
- *
- * Props:
- *   cardId    – if provided, loads and edits that card (edit mode)
- *   onSaved   – called with the saved card object after a successful save
- *   onCancel  – called when the user taps Back / Cancel
- */
+// Self-contained card builder form used for both creating and editing cards.
+//
+// Props:
+//   cardId   - if provided, loads and edits that card (edit mode)
+//   onSaved  - called with the saved card object after a successful save
+//   onCancel - called when the user taps Back / Cancel
 export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
   const isEdit = Boolean(cardId);
 
@@ -139,7 +137,7 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
   const isFront = activeTab === 'front';
   const currentImageField = isFront ? 'front_image_url' : 'back_image_url';
   const currentImageUrl = isFront ? card.front_image_url : card.back_image_url;
-  // Disable image upload interaction on back tab when a colour/pattern style is chosen
+  // Image upload is disabled on the back tab when a colour or pattern style is active
   const imageClickEnabled = !uploading && (isFront || backStyle === 'custom');
 
   async function handleFileChange(e) {

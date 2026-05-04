@@ -49,7 +49,7 @@ export default function GamePage() {
   useEffect(() => { navigateRef.current = navigate; }, [navigate]);
   useEffect(() => { gameIdRef.current = gameId; }, [gameId]);
 
-  // Derived
+  // position 0 means the game hasn't started yet; treat it as position 1 so the UI always has a valid current player
   const effectivePos = currentPlayerPos === 0 ? 1 : currentPlayerPos;
   const currentPlayer = players.find((p) => p.player_position === effectivePos);
   const isMyTurn = currentPlayer?.user_id === user?.userId;

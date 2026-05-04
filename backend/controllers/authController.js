@@ -5,6 +5,7 @@ const db = require('../db');
 
 const SALT_ROUNDS = 10;
 
+// Signs a JWT containing the user's id, username, and email
 const generateToken = (user) => {
   return jwt.sign(
     { userId: user.user_id, username: user.username, email: user.email },
@@ -13,6 +14,8 @@ const generateToken = (user) => {
   );
 };
 
+// POST /api/auth/register
+// Creates a new account, assigns starter decks to the new user, and returns a JWT
 const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -61,6 +64,7 @@ const register = async (req, res) => {
         'INSERT INTO user_decks (user_id, deck_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
         [user.user_id, deckId]
       );
+      // Copy the deck's cards into the new user's card library so they can build with them
       await db.query(
         `INSERT INTO cards
            (created_by_user_id, card_name, front_text, front_image_url,
@@ -92,6 +96,8 @@ const register = async (req, res) => {
   }
 };
 
+// POST /api/auth/login
+// Validates credentials and returns a JWT on success
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -133,6 +139,8 @@ const login = async (req, res) => {
   }
 };
 
+// GET /api/auth/me
+// Returns the authenticated user's profile from the database
 const getMe = async (req, res) => {
   try {
     const result = await db.query(
@@ -158,6 +166,8 @@ const getMe = async (req, res) => {
   }
 };
 
+// PUT /api/auth/password
+// Verifies the current password before hashing and saving the new one
 const updatePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -197,6 +207,8 @@ const updatePassword = async (req, res) => {
   }
 };
 
+// POST /api/auth/refresh
+// Issues a fresh JWT for the already-authenticated user, extending their session
 const refreshToken = (req, res) => {
   const token = generateToken({
     user_id: req.user.userId,
@@ -207,6 +219,9 @@ const refreshToken = (req, res) => {
   res.json({ token });
 };
 
+// POST /api/auth/guest
+// Issues a short-lived guest JWT tied to a specific game code so unauthenticated
+// players can join a session without creating a full account
 const guest = async (req, res) => {
   try {
     const { username, game_code } = req.body;
@@ -230,6 +245,8 @@ const guest = async (req, res) => {
       return res.status(400).json({ error: 'This game has already ended' });
     }
 
+    // Guest tokens carry userId: null and isGuest: true so the rest of the
+    // system can distinguish them from registered users
     const guestId = crypto.randomUUID();
     const token = jwt.sign(
       { userId: null, username, guestId, isGuest: true },

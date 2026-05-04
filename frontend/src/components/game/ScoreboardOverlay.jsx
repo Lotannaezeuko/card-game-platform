@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../../api';
 
+// Overlay showing live scores for all players.
+// Hosts get editable score inputs; non-hosts see read-only values.
 export default function ScoreboardOverlay({ gameId, isHost, onClose }) {
   const [scores, setScores] = useState([]);
   const [edits, setEdits] = useState({});

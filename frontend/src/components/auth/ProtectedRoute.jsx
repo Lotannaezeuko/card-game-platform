@@ -1,6 +1,8 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
+// Wraps a route and redirects unauthenticated users to /login.
+// Shows a spinner while the auth context is still rehydrating from storage.
 export default function ProtectedRoute({ children }) {
   const { token, loading } = useAuth();
 

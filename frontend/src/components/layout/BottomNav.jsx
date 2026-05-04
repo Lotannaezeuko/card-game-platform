@@ -7,6 +7,7 @@ const tabs = [
   { label: 'Games', path: '/games/setup', icon: GameIcon },
 ];
 
+// Bottom navigation bar. Hidden on the game play screen to maximise board space.
 export default function BottomNav() {
   const location = useLocation();
   const hideOnPaths = [/^\/games\/\d+\/play/];

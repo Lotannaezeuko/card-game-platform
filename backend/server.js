@@ -17,10 +17,12 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
 
+// In production, only the configured FRONTEND_URL is allowed.
+// In development, any localhost or local network IP is allowed so the app
+// can be tested from other devices on the same network.
 const allowedOrigins = process.env.FRONTEND_URL
   ? [process.env.FRONTEND_URL]
   : (origin, callback) => {
-      // In dev, allow localhost and local network origins
       if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin)) {
         callback(null, true);
       } else {
@@ -35,39 +37,34 @@ const io = new Server(server, {
   },
 });
 
-// Make io accessible in controllers via req.app.get('io')
+// Make io accessible inside controllers via req.app.get('io')
 app.set('io', io);
 
 initSocket(io);
 
-// Middleware
 app.use(cors({
   origin: allowedOrigins,
   credentials: true,
 }));
 app.use(express.json());
 
-// Static uploads
+// Serve uploaded card images as static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/decks', deckRoutes);
 app.use('/api/cards', cardRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/upload', uploadRoutes);
 
-// Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-// Error handler
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
   res.status(500).json({ error: 'Internal server error' });

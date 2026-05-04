@@ -2,11 +2,14 @@ const db = require('../db');
 
 const DEFAULT_LIMIT = 50;
 
+// GET /api/cards
+// Returns a paginated list of cards belonging to the authenticated user
 const getAllCards = async (req, res) => {
   try {
     const { limit, offset } = req.query;
     const userId = req.user.userId;
 
+    // Cap at 100 to prevent oversized responses
     const queryLimit = Math.min(parseInt(limit) || DEFAULT_LIMIT, 100);
     const queryOffset = parseInt(offset) || 0;
 
@@ -42,6 +45,8 @@ const getAllCards = async (req, res) => {
   }
 };
 
+// GET /api/cards/:card_id
+// Returns a single card with creator details
 const getCardById = async (req, res) => {
   try {
     const { card_id } = req.params;
@@ -68,6 +73,8 @@ const getCardById = async (req, res) => {
   }
 };
 
+// POST /api/cards
+// Creates a new card owned by the authenticated user
 const createCard = async (req, res) => {
   try {
     const {
@@ -113,6 +120,8 @@ const createCard = async (req, res) => {
   }
 };
 
+// PUT /api/cards/:card_id
+// Updates only the fields that were provided (partial update)
 const updateCard = async (req, res) => {
   try {
     const { card_id } = req.params;
@@ -144,6 +153,7 @@ const updateCard = async (req, res) => {
       return res.status(400).json({ error: 'Card name cannot be empty' });
     }
 
+    // Build the SET clause dynamically so untouched fields are never overwritten
     const updates = [];
     const values = [];
     let paramIndex = 1;
@@ -201,6 +211,8 @@ const updateCard = async (req, res) => {
   }
 };
 
+// DELETE /api/cards/:card_id
+// Blocks deletion if the card is currently used in any deck
 const deleteCard = async (req, res) => {
   try {
     const { card_id } = req.params;
@@ -238,6 +250,8 @@ const deleteCard = async (req, res) => {
   }
 };
 
+// POST /api/decks/:deck_id/cards
+// Adds a card to a deck or updates its quantity if it already exists
 const addCardToDeck = async (req, res) => {
   try {
     const { deck_id } = req.params;
@@ -280,12 +294,14 @@ const addCardToDeck = async (req, res) => {
 
     let result;
     if (existingResult.rows.length > 0) {
+      // Card already in deck, update its quantity instead of inserting a duplicate
       result = await db.query(
         `UPDATE deck_cards SET quantity = $1 WHERE deck_id = $2 AND card_id = $3
          RETURNING deck_card_id, deck_id, card_id, quantity, card_order`,
         [quantity, deck_id, card_id]
       );
     } else {
+      // Append to the end of the deck's card order
       const maxOrderResult = await db.query(
         'SELECT COALESCE(MAX(card_order), 0) + 1 AS next_order FROM deck_cards WHERE deck_id = $1',
         [deck_id]
@@ -307,6 +323,8 @@ const addCardToDeck = async (req, res) => {
   }
 };
 
+// DELETE /api/decks/:deck_id/cards/:card_id
+// Removes a specific card from a deck
 const removeCardFromDeck = async (req, res) => {
   try {
     const { deck_id, card_id } = req.params;

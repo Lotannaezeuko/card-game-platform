@@ -1,6 +1,7 @@
 const db = require('../db');
 const { emitPlayerJoined, emitPlayerLeft, emitTurnPassed } = require('../socket/handlers/gameplay');
 
+// Generates a random 6-character alphanumeric code used to identify a game room
 const generateGameCode = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let code = '';
@@ -10,6 +11,8 @@ const generateGameCode = () => {
   return code;
 };
 
+// POST /api/games/join
+// Lets a user join a game by its code. If they are already a player, returns the game without inserting a duplicate.
 const joinByCode = async (req, res) => {
   try {
     const { game_code } = req.body;
@@ -43,7 +46,7 @@ const joinByCode = async (req, res) => {
     );
 
     if (existingPlayer.rows.length > 0) {
-      // Already in the game — just return the game so they can navigate to lobby
+      // Already in the game, return the game so the client can navigate to the lobby
       return res.json({ game, message: 'Already in game' });
     }
 
@@ -61,6 +64,7 @@ const joinByCode = async (req, res) => {
 
     res.status(201).json({ game, message: 'Joined game successfully' });
 
+    // Notify players already in the lobby about the new arrival
     emitPlayerJoined(req.app.get('io'), game.game_code, {
       user_id: req.user.userId,
       username: req.user.username,
@@ -72,6 +76,9 @@ const joinByCode = async (req, res) => {
   }
 };
 
+// GET /api/games
+// Returns all games where the user is the host or a player.
+// Add ?active=true to exclude ended games.
 const getAllGames = async (req, res) => {
   try {
     const { active } = req.query;
@@ -101,6 +108,9 @@ const getAllGames = async (req, res) => {
   }
 };
 
+// GET /api/games/:game_id
+// Returns a game with its player list and the top card of the discard pile.
+// Access is restricted to the host and current players.
 const getGameById = async (req, res) => {
   try {
     const { game_id } = req.params;
@@ -131,7 +141,7 @@ const getGameById = async (req, res) => {
 
     const isHost = game.host_user_id === req.user.userId;
     const isGuest = req.user.isGuest === true;
-    // In JS, null === null is true, so this works for guests with user_id = null
+    // In JS, null === null is true, so this check works correctly for guests whose user_id is null
     const isPlayer = isGuest
       ? playerResult.rows.some((p) => p.user_id === null)
       : playerResult.rows.some((p) => p.user_id === req.user.userId);
@@ -159,6 +169,9 @@ const getGameById = async (req, res) => {
   }
 };
 
+// POST /api/games
+// Creates a new game and adds the host as the first player.
+// Retries game code generation up to 10 times in the unlikely event of a collision.
 const createGame = async (req, res) => {
   try {
     const { deck_id, is_online, starting_hand_size, turn_direction, deal_method } = req.body;
@@ -176,6 +189,7 @@ const createGame = async (req, res) => {
       return res.status(404).json({ error: 'Deck not found' });
     }
 
+    // Allow users who were assigned the deck via user_decks (e.g. starter decks) to use it
     const ownsOrAssigned =
       deckResult.rows[0].user_id === req.user.userId ||
       (await db.query(
@@ -187,6 +201,7 @@ const createGame = async (req, res) => {
       return res.status(403).json({ error: 'Access denied. You do not own this deck.' });
     }
 
+    // Retry generation to handle rare duplicate code collisions
     let game_code;
     let attempts = 0;
     while (attempts < 10) {
@@ -229,6 +244,8 @@ const createGame = async (req, res) => {
   }
 };
 
+// PUT /api/games/:game_id/state
+// Persists an arbitrary JSON game state object, used by the frontend to sync board state
 const updateGameState = async (req, res) => {
   try {
     const { game_id } = req.params;
@@ -272,6 +289,8 @@ const updateGameState = async (req, res) => {
   }
 };
 
+// PUT /api/games/:game_id/end
+// Marks a game as ended. Only the host can call this.
 const endGame = async (req, res) => {
   try {
     const { game_id } = req.params;
@@ -305,6 +324,8 @@ const endGame = async (req, res) => {
   }
 };
 
+// POST /api/games/:game_id/players
+// Adds a player to an existing game. Supports both registered users and anonymous (guest) players.
 const addPlayerToGame = async (req, res) => {
   try {
     const { game_id } = req.params;
@@ -375,6 +396,8 @@ const addPlayerToGame = async (req, res) => {
   }
 };
 
+// DELETE /api/games/:game_id/players/:game_player_id
+// Removes a player from a game. Only the host or the player themselves may do this.
 const removePlayerFromGame = async (req, res) => {
   try {
     const { game_id, game_player_id } = req.params;
@@ -417,6 +440,8 @@ const removePlayerFromGame = async (req, res) => {
   }
 };
 
+// PUT /api/games/:game_id/turn
+// Allows the host to manually set the current player position and broadcast the change
 const adjustTurn = async (req, res) => {
   try {
     const { game_id } = req.params;

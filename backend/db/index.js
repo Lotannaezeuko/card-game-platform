@@ -1,5 +1,7 @@
 const { Pool } = require('pg');
 
+// Single connection pool shared across all controllers.
+// Connection config is loaded from environment variables set in .env.
 const pool = new Pool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,

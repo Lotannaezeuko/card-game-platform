@@ -36,7 +36,7 @@ export default function EndSessionPage() {
     try {
       await apiFetch(`/games/${gameId}/session/end`, { method: 'PUT' });
     } catch {
-      // might already be ended — still navigate home
+      // Silently ignore: game may already be ended (e.g. host refreshed after ending)
     }
     navigate('/home');
   }

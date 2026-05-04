@@ -4,6 +4,9 @@ import { useAuth } from './AuthContext';
 
 const SocketContext = createContext(null);
 
+// Opens a single Socket.IO connection when the user is authenticated and closes
+// it automatically when they log out. Uses window.location.hostname so the
+// socket URL works when testing from other devices on the local network.
 export function SocketProvider({ children }) {
   const { token, user } = useAuth();
   const socketRef = useRef(null);
@@ -19,6 +22,8 @@ export function SocketProvider({ children }) {
       return;
     }
 
+    // Prefer the storage value over the React state token to avoid sending a
+    // stale token when the effect runs before state settles
     const activeToken = sessionStorage.getItem('token') || localStorage.getItem('token') || token;
     const s = io(`http://${window.location.hostname}:3001`, {
       auth: { token: activeToken },

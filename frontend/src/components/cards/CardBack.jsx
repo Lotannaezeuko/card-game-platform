@@ -1,9 +1,9 @@
 // Card back face renderer.
-// Fills whatever container it's rendered inside (absolute inset-0).
+// Fills whatever container it is rendered inside (absolute inset-0).
 //
 // Props:
-//   backColour  – hex colour string e.g. '#1B3A5C'. Renders a solid colour background.
-//   backPattern – pattern name string. Renders an SVG pattern on a dark background.
+//   backColour  - hex colour string e.g. '#1B3A5C'. Renders a solid colour background.
+//   backPattern - pattern name string. Renders an SVG pattern on a dark background.
 //
 // Priority: backColour > backPattern > default (indigo diamond pattern)
 

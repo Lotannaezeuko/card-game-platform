@@ -2,13 +2,15 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import BoardCard from './BoardCard';
 
+// Droppable canvas where players place board cards.
+// Supports mouse wheel zoom and two-finger pinch-to-zoom on touch devices.
 export default function GameBoard({ boardCards, isHost, onClearBoard, scale, onScaleChange, className = '' }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'game-board' });
 
   // Keep a stable ref to the canvas element so event listeners can be attached
   const canvasRef = useRef(null);
 
-  // Ref for current scale — avoids stale closures in event handlers
+  // Ref for current scale to avoid stale closures in wheel/touch event handlers
   const scaleRef = useRef(scale);
   useEffect(() => { scaleRef.current = scale; }, [scale]);
 

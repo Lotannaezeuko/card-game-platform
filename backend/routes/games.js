@@ -5,6 +5,7 @@ const gameActionsController = require('../controllers/gameActionsController');
 
 const router = express.Router();
 
+// Game lobby and session management
 router.post('/join', authenticateToken, gameController.joinByCode);
 router.get('/', authenticateToken, gameController.getAllGames);
 router.get('/:game_id', authenticateToken, gameController.getGameById);
@@ -15,6 +16,7 @@ router.put('/:game_id/end', authenticateToken, gameController.endGame);
 router.post('/:game_id/players', authenticateToken, gameController.addPlayerToGame);
 router.delete('/:game_id/players/:game_player_id', authenticateToken, gameController.removePlayerFromGame);
 
+// In-game actions
 router.get('/:game_id/hand', authenticateToken, gameActionsController.getPlayerHand);
 router.post('/:game_id/deal', authenticateToken, gameActionsController.dealStartingHand);
 router.post('/:game_id/draw', authenticateToken, gameActionsController.drawCard);

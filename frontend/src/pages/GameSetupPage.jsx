@@ -27,6 +27,7 @@ export default function GameSetupPage() {
       .then((data) => {
         const loaded = data.decks || [];
         setDecks(loaded);
+        // Pre-select deck when arriving from the HomePage "jump back in" shortcut
         if (navState?.deck_id) {
           const match = loaded.find((d) => d.deck_id === navState.deck_id);
           if (match) setDeckId(String(match.deck_id));

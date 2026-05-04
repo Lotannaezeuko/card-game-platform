@@ -10,6 +10,7 @@ const {
   emitGameEnded,
 } = require('../socket/handlers/gameplay');
 
+// Fisher-Yates shuffle used when dealing hands and reshuffling the draw pile
 const shuffle = (array) => {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -18,6 +19,9 @@ const shuffle = (array) => {
   return array;
 };
 
+// POST /api/games/:game_id/deal
+// Shuffles the deck, deals a starting hand to every player, places the
+// remainder in the draw pile, and marks the game as active
 const dealStartingHand = async (req, res) => {
   try {
     const { game_id } = req.params;
@@ -49,6 +53,7 @@ const dealStartingHand = async (req, res) => {
     );
     const players = playersResult.rows;
 
+    // Expand deck_cards by quantity so each copy is treated as a separate draw
     const deckCardsResult = await db.query(
       'SELECT card_id, quantity FROM deck_cards WHERE deck_id = $1',
       [game.deck_id]
@@ -62,6 +67,7 @@ const dealStartingHand = async (req, res) => {
     }
     shuffle(expandedDeck);
 
+    // Deal cards from the front of the shuffled deck to each player in order
     const handSize = game.starting_hand_size;
     for (const player of players) {
       const playerCards = expandedDeck.splice(0, handSize);
@@ -73,6 +79,7 @@ const dealStartingHand = async (req, res) => {
       }
     }
 
+    // Remaining cards after dealing become the draw pile, ordered by their position in the shuffled deck
     for (let i = 0; i < expandedDeck.length; i++) {
       await db.query(
         'INSERT INTO session_draw_pile (game_id, card_id, pile_order) VALUES ($1, $2, $3)',
@@ -97,6 +104,8 @@ const dealStartingHand = async (req, res) => {
   }
 };
 
+// GET /api/games/:game_id/hand
+// Returns the authenticated player's current hand for this game
 const getPlayerHand = async (req, res) => {
   try {
     const { game_id } = req.params;
@@ -128,6 +137,9 @@ const getPlayerHand = async (req, res) => {
   }
 };
 
+// POST /api/games/:game_id/draw
+// Draws the next undrawn card from the draw pile and adds it to the player's hand.
+// current_player_position of 0 is treated as position 1 (game just started, no turn set yet).
 const drawCard = async (req, res) => {
   try {
     const { game_id } = req.params;
@@ -147,6 +159,7 @@ const drawCard = async (req, res) => {
     );
 
     const { current_player_position, game_code } = gameResult.rows[0];
+    // Treat 0 as position 1 so the first player can act before any turn has been explicitly set
     const effectivePosition = current_player_position === 0 ? 1 : current_player_position;
 
     if (playerResult.rows[0].player_position !== effectivePosition) {
@@ -176,6 +189,7 @@ const drawCard = async (req, res) => {
 
     res.status(201).json({ hand_entry: handResult.rows[0] });
 
+    // Broadcast that a draw happened without revealing the card to other players
     emitCardDrawn(req.app.get('io'), game_code, {
       user_id: req.user.userId,
       username: req.user.username,
@@ -186,6 +200,9 @@ const drawCard = async (req, res) => {
   }
 };
 
+// POST /api/games/:game_id/play
+// Removes a card from the player's hand and places it on the discard pile,
+// then broadcasts the full card details to all players in the room
 const playCard = async (req, res) => {
   try {
     const { game_id } = req.params;
@@ -253,6 +270,9 @@ const playCard = async (req, res) => {
   }
 };
 
+// POST /api/games/:game_id/pass
+// Advances the turn to the next player using modular arithmetic to wrap around.
+// Supports both clockwise and counterclockwise turn directions.
 const passTurn = async (req, res) => {
   try {
     const { game_id } = req.params;
@@ -295,6 +315,7 @@ const passTurn = async (req, res) => {
       return res.status(400).json({ error: 'No players in this game' });
     }
 
+    // Positions are 1-indexed so we convert to 0-based before applying modulo, then back
     let nextPosition;
     if (turn_direction === 'counterclockwise') {
       nextPosition = ((effectivePosition - 2 + playerCount) % playerCount) + 1;
@@ -319,6 +340,9 @@ const passTurn = async (req, res) => {
   }
 };
 
+// POST /api/games/:game_id/reshuffle
+// Moves all cards from the discard pile back into the draw pile in a new random order.
+// New cards are appended after the existing draw pile so in-flight draws are not disrupted.
 const reshuffleDeck = async (req, res) => {
   try {
     const { game_id } = req.params;
@@ -350,6 +374,7 @@ const reshuffleDeck = async (req, res) => {
     const cardIds = discardResult.rows.map((r) => r.card_id);
     shuffle(cardIds);
 
+    // Start pile_order after the last existing draw pile entry to preserve draw order
     const maxOrderResult = await db.query(
       'SELECT COALESCE(MAX(pile_order), 0) AS max_order FROM session_draw_pile WHERE game_id = $1',
       [game_id]
@@ -377,6 +402,8 @@ const reshuffleDeck = async (req, res) => {
   }
 };
 
+// PUT /api/games/:game_id/score
+// Updates a player's score. Only the host can call this.
 const updateScore = async (req, res) => {
   try {
     const { game_id } = req.params;
@@ -428,6 +455,8 @@ const updateScore = async (req, res) => {
   }
 };
 
+// GET /api/games/:game_id/scores
+// Returns all player scores ordered from highest to lowest
 const getFinalScores = async (req, res) => {
   try {
     const { game_id } = req.params;
@@ -473,6 +502,8 @@ const getFinalScores = async (req, res) => {
   }
 };
 
+// PUT /api/games/:game_id/session/end
+// Ends the game session, broadcasts final scores to all players in the room
 const endSession = async (req, res) => {
   try {
     const { game_id } = req.params;
@@ -520,6 +551,9 @@ const endSession = async (req, res) => {
   }
 };
 
+// POST /api/games/:game_id/board
+// Moves a card from the player's hand to the shared board stored in game_state.
+// The full board array is sent by the client so the server just persists it.
 const placeCardOnBoard = async (req, res) => {
   try {
     const { game_id } = req.params;
@@ -529,7 +563,6 @@ const placeCardOnBoard = async (req, res) => {
       return res.status(400).json({ error: 'hand_id and board array are required' });
     }
 
-    // Verify game exists and is active
     const gameResult = await db.query(
       'SELECT game_code, game_state, status FROM games WHERE game_id = $1',
       [game_id]
@@ -538,7 +571,7 @@ const placeCardOnBoard = async (req, res) => {
     const game = gameResult.rows[0];
     if (game.status !== 'active') return res.status(400).json({ error: 'Game is not active' });
 
-    // Verify card belongs to this player's hand
+    // Confirm the card belongs to this player before moving it
     const handCheck = await db.query(
       `SELECT ph.hand_id, c.card_id, c.card_name
        FROM player_hands ph
@@ -551,17 +584,15 @@ const placeCardOnBoard = async (req, res) => {
     }
     const { card_name } = handCheck.rows[0];
 
-    // Remove card from player_hands
     await db.query('DELETE FROM player_hands WHERE hand_id = $1', [hand_id]);
 
-    // Persist the updated board in game_state
+    // Merge the new board into the existing game_state so other fields are preserved
     const existingState = game.game_state || {};
     await db.query(
       'UPDATE games SET game_state = $1 WHERE game_id = $2',
       [JSON.stringify({ ...existingState, board }), game_id]
     );
 
-    // Notify all players
     emitBoardCardPlaced(req.app.get('io'), game.game_code, {
       user_id: req.user.userId,
       username: req.user.username,

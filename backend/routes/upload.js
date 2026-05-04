@@ -8,6 +8,9 @@ const { authenticateToken } = require('../middleware/auth');
 const { upload, UPLOADS_DIR } = require('../middleware/upload');
 
 // POST /api/upload/image
+// Accepts a multipart image upload and returns its public URL.
+// HEIC/HEIF files (common on iPhones) are converted to JPEG using sharp
+// because browsers cannot display HEIC natively.
 router.post('/image', authenticateToken, (req, res) => {
   upload.single('image')(req, res, async (err) => {
     if (err) {
@@ -30,6 +33,7 @@ router.post('/image', authenticateToken, (req, res) => {
         const newFilename = uuidv4() + '.jpg';
         const newPath = path.join(UPLOADS_DIR, newFilename);
         await sharp(file.path).jpeg({ quality: 90 }).toFile(newPath);
+        // Remove the original HEIC file after conversion
         fs.unlinkSync(file.path);
         return res.json({ url: `/uploads/${newFilename}` });
       } catch (convertErr) {

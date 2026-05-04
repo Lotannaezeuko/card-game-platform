@@ -23,7 +23,8 @@ export default function LobbyPage() {
   const navigateRef = useRef(navigate);
   useEffect(() => { navigateRef.current = navigate; }, [navigate]);
 
-  // Load game data — redirect immediately if already active
+  // Load game data. Redirect immediately if the game is already active so
+  // players who refresh mid-game land on the play page instead of the lobby.
   useEffect(() => {
     apiFetch(`/games/${gameId}`)
       .then((data) => {
@@ -43,16 +44,15 @@ export default function LobbyPage() {
       .catch((err) => setError(err.message || 'Failed to load game'));
   }, [gameId, user]); // intentionally omitting navigate — stable ref used
 
-  // Socket: join room + bind events
+  // Join the socket room and listen for lobby events.
+  // navigate is accessed via a ref so this effect never re-runs when navigate changes.
   useEffect(() => {
     if (!socket || !game) return;
 
     socket.emit('join_game', { game_code: game.game_code });
 
-    // Server confirms join — also tells us current status
     socket.on('joined_game', ({ game_code, status, player_position }) => {
       if (game_code !== game.game_code) return;
-      // Find our game_player_id from the players list
       setPlayers((prev) => {
         const me = prev.find((p) =>
           user?.isGuest ? p.user_id === null : p.user_id === user?.userId
@@ -60,7 +60,7 @@ export default function LobbyPage() {
         if (me) setConnectedPlayerIds((s) => new Set([...s, me.game_player_id]));
         return prev;
       });
-      // If game already started when we joined (e.g. late joiner), go straight to play
+      // Late joiners (e.g. joining mid-game via code) go straight to the play page
       if (status === 'active') {
         navigateRef.current(`/games/${gameId}/play`, { replace: true });
       }

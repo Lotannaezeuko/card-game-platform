@@ -61,7 +61,7 @@ export default function DeckBuilderPage() {
       .finally(() => setLoadingDeck(false));
   }, [deckId, isEdit]);
 
-  // Load card library when reaching step 3
+  // Lazy-load the card library only when the user reaches step 3 to avoid an unnecessary fetch on mount
   useEffect(() => {
     if (step !== 3 || library.length > 0) return;
     setLoadingCards(true);
@@ -75,7 +75,7 @@ export default function DeckBuilderPage() {
     setSelectedCards((prev) => {
       const exists = prev.find((c) => c.card_id === card.card_id);
       if (exists) return prev;
-      // Respect deck no-duplicates rule and card uniqueness
+      // Cap at 1 if the deck forbids duplicates OR the card itself is marked unique
       const qty = (noDuplicates || card.is_unique) ? 1 : (card.default_copies || 1);
       return [...prev, {
         card_id: card.card_id,

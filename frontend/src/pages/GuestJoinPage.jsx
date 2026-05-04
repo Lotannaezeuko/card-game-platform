@@ -15,6 +15,7 @@ export default function GuestJoinPage() {
     setError('');
     setLoading(true);
     try {
+      // Two-step flow: create guest token first, then join the game as a player
       const data = await apiFetch('/auth/guest', { method: 'POST', body: form });
       loginAsGuest(data.token);
 

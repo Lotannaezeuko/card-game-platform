@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import FlippableCard from '../cards/FlippableCard';
 
+// A card placed on the shared game board. Draggable via dnd-kit and tappable to flip.
 export default function BoardCard({ card }) {
   const [isFlipped, setIsFlipped] = useState(false);
 

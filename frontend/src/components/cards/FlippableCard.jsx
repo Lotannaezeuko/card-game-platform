@@ -1,18 +1,20 @@
 import CardBack from './CardBack';
 
-/**
- * Props:
- *   cardName       – displayed in the card header / name row
- *   frontText      – text on the front face
- *   frontImageUrl  – image on the front face
- *   backText       – text on the back face
- *   backImageUrl   – image on the back face
- *   attributes     – card attributes object ({ backColour, backPattern, ... })
- *   isSelected     – shows a selection ring (hand mode)
- *   isFlipped      – controlled externally; drives the CSS 3D flip
- *   onSelect       – called when the card is tapped
- *   size           – 'hand' | 'library'  (default 'hand')
- */
+// A card component that supports a CSS 3D flip animation.
+// The flip state is controlled by the parent so multiple cards in a hand
+// cannot be flipped simultaneously.
+//
+// Props:
+//   cardName      - displayed in the card header / name row
+//   frontText     - text on the front face
+//   frontImageUrl - image on the front face
+//   backText      - text on the back face
+//   backImageUrl  - image on the back face
+//   attributes    - card attributes object ({ backColour, backPattern, ... })
+//   isSelected    - shows a selection ring (hand mode)
+//   isFlipped     - controlled externally; drives the CSS 3D flip
+//   onSelect      - called when the card is tapped
+//   size          - 'hand' | 'library'  (default 'hand')
 export default function FlippableCard({
   cardName,
   frontText,
@@ -29,14 +31,12 @@ export default function FlippableCard({
   const backColour = attributes?.backColour || null;
   const backPattern = attributes?.backPattern || null;
 
-  // ── Sizing ───────────────────────────────────────────────────────
   // hand:    matches existing HandRow card dimensions
   // library: full-width, fixed height that mirrors the old CardThumbnail
   const outerClass = isHand
     ? 'flex-none w-20 h-28'
     : 'w-full h-48';
 
-  // ── Selection visual (hand only) ─────────────────────────────────
   const selectionClass = isSelected && isHand
     ? 'scale-105 -translate-y-2'
     : '';
@@ -55,7 +55,7 @@ export default function FlippableCard({
       style={{ perspective: '800px' }}
       onClick={onSelect}
     >
-      {/* ── 3D flip container ───────────────────────────────────── */}
+      {/* 3D flip container */}
       <div
         className={`relative w-full h-full rounded-xl ${shadowClass}`}
         style={{
@@ -65,7 +65,7 @@ export default function FlippableCard({
         }}
       >
 
-        {/* ── Front face ──────────────────────────────────────── */}
+        {/* Front face */}
         <div
           className={`absolute inset-0 rounded-xl overflow-hidden bg-white border-2 ${frontBorderClass} flex flex-col`}
           style={{ backfaceVisibility: 'hidden' }}
@@ -112,7 +112,7 @@ export default function FlippableCard({
           )}
         </div>
 
-        {/* ── Back face ───────────────────────────────────────── */}
+        {/* Back face - rotated 180deg so it appears when the container flips */}
         <div
           className="absolute inset-0 rounded-xl overflow-hidden"
           style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}

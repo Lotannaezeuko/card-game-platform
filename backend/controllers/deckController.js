@@ -1,5 +1,8 @@
 const db = require('../db');
 
+// GET /api/decks
+// When is_public=true, returns all public decks.
+// Otherwise returns decks the user owns plus any assigned to them via user_decks.
 const getAllDecks = async (req, res) => {
   try {
     const { is_public } = req.query;
@@ -47,6 +50,8 @@ const getAllDecks = async (req, res) => {
   }
 };
 
+// GET /api/decks/:deck_id
+// Returns a deck with its full card list. Private decks are only accessible to their owner.
 const getDeckById = async (req, res) => {
   try {
     const { deck_id } = req.params;
@@ -92,6 +97,8 @@ const getDeckById = async (req, res) => {
   }
 };
 
+// POST /api/decks
+// Creates a new deck owned by the authenticated user
 const createDeck = async (req, res) => {
   try {
     const {
@@ -137,6 +144,8 @@ const createDeck = async (req, res) => {
   }
 };
 
+// PUT /api/decks/:deck_id
+// Updates only the fields that were provided (partial update)
 const updateDeck = async (req, res) => {
   try {
     const { deck_id } = req.params;
@@ -173,6 +182,7 @@ const updateDeck = async (req, res) => {
       }
     }
 
+    // Build the SET clause dynamically so untouched fields are never overwritten
     const updates = [];
     const values = [];
     let paramIndex = 1;
@@ -230,6 +240,9 @@ const updateDeck = async (req, res) => {
   }
 };
 
+// DELETE /api/decks/:deck_id
+// If the user owns the deck, it is permanently deleted.
+// If they only have it in their library (user_decks), it is removed from their library only.
 const deleteDeck = async (req, res) => {
   try {
     const { deck_id } = req.params;
@@ -244,12 +257,11 @@ const deleteDeck = async (req, res) => {
     }
 
     if (deckResult.rows[0].user_id === req.user.userId) {
-      // User owns the deck — hard delete it
       await db.query('DELETE FROM decks WHERE deck_id = $1', [deck_id]);
       return res.json({ message: 'Deck deleted successfully' });
     }
 
-    // User doesn't own it — check if it's in their library
+    // User does not own it, remove it from their personal library
     const assignmentResult = await db.query(
       'DELETE FROM user_decks WHERE user_id = $1 AND deck_id = $2 RETURNING user_deck_id',
       [req.user.userId, deck_id]

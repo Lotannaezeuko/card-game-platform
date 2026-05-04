@@ -1,5 +1,7 @@
 const BASE_URL = '/api';
 
+// Thin wrapper around fetch that attaches the JWT from storage and serialises the
+// request body as JSON. Throws a plain object with status and message on non-2xx responses.
 export async function apiFetch(path, options = {}) {
   const token = sessionStorage.getItem('token') || localStorage.getItem('token');
   const res = await fetch(`${BASE_URL}${path}`, {

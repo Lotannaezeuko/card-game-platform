@@ -5,13 +5,14 @@ const cardController = require('../controllers/cardController');
 
 const router = express.Router();
 
+// Deck CRUD routes
 router.get('/', authenticateToken, deckController.getAllDecks);
 router.get('/:deck_id', authenticateToken, deckController.getDeckById);
 router.post('/', authenticateToken, deckController.createDeck);
 router.put('/:deck_id', authenticateToken, deckController.updateDeck);
 router.delete('/:deck_id', authenticateToken, deckController.deleteDeck);
 
-// Deck-card management
+// Card membership within a deck
 router.post('/:deck_id/cards', authenticateToken, cardController.addCardToDeck);
 router.delete('/:deck_id/cards/:card_id', authenticateToken, cardController.removeCardFromDeck);
 

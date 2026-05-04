@@ -21,6 +21,7 @@ export default function HomePage() {
       .catch(() => {});
   }, []);
 
+  // Close the profile dropdown when the user clicks outside the menu container
   useEffect(() => {
     function handleClick(e) {
       if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);

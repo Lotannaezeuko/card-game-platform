@@ -7,6 +7,7 @@ import FlippableCard from '../components/cards/FlippableCard';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Modal from '../components/ui/Modal';
 
+// Fetch 50 cards at a time; "See more" button appends the next page
 const PAGE_SIZE = 50;
 
 export default function CardsPage() {

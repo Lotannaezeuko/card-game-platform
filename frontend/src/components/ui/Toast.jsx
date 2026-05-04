@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-// Returns [toasts, addToast] — addToast auto-dismisses after 3s
+// Returns [toasts, addToast]. Each toast auto-dismisses after 3 seconds.
 export function useToasts() {
   const [toasts, setToasts] = useState([]);
 

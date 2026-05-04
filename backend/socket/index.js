@@ -1,6 +1,8 @@
 const authenticateSocket = require('./authMiddleware');
 const registerGameHandlers = require('./handlers/game');
 
+// Initialises the Socket.IO server: applies JWT auth middleware then registers
+// all game event handlers for each new connection
 const initSocket = (io) => {
   io.use(authenticateSocket);
 

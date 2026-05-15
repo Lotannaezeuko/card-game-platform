@@ -33,6 +33,7 @@ export function AuthProvider({ children }) {
   // Persists the token in localStorage (survives tab close)
   function login(newToken) {
     const decoded = decodeToken(newToken);
+    sessionStorage.removeItem('token');
     localStorage.setItem('token', newToken);
     setToken(newToken);
     setUser(decoded);
@@ -41,6 +42,7 @@ export function AuthProvider({ children }) {
   // Persists the token in sessionStorage only (cleared when the tab closes)
   function loginAsGuest(newToken) {
     const decoded = decodeToken(newToken);
+    localStorage.removeItem('token');
     sessionStorage.setItem('token', newToken);
     setToken(newToken);
     setUser(decoded);

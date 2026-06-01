@@ -25,7 +25,8 @@ export function SocketProvider({ children }) {
     // Prefer the storage value over the React state token to avoid sending a
     // stale token when the effect runs before state settles
     const activeToken = sessionStorage.getItem('token') || localStorage.getItem('token') || token;
-    const s = io(`http://${window.location.hostname}:3001`, {
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || `http://${window.location.hostname}:3001`;
+    const s = io(socketUrl, {
       auth: { token: activeToken },
     });
 

@@ -251,6 +251,7 @@ const DECKS = [
       unique_cards: 30,
       is_public: true,
     },
+    assignToAll: true,
     cards: [
       ['France', 'Paris'], ['Germany', 'Berlin'], ['Japan', 'Tokyo'],
       ['Brazil', 'Brasília'], ['Australia', 'Canberra'], ['Canada', 'Ottawa'],

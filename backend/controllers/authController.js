@@ -56,7 +56,7 @@ const register = async (req, res) => {
     // Auto-assign starter decks to every new user and copy cards into their library
     const starterDecks = await db.query(
       `SELECT deck_id FROM decks
-       WHERE deck_name IN ('Standard Playing Cards', 'Animal Charades')
+       WHERE deck_name IN ('Standard Playing Cards', 'Animal Charades', 'World Capitals Flashcards')
        AND is_public = true`
     );
     for (const { deck_id: deckId } of starterDecks.rows) {

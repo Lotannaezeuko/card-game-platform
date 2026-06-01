@@ -1,15 +1,16 @@
 const { Pool } = require('pg');
 
-// Single connection pool shared across all controllers.
-// Connection config is loaded from environment variables set in .env.
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  ssl: { rejectUnauthorized: false }
-});
+// Prefer a single DATABASE_URL (Neon/Railway style) over individual vars.
+const pool = process.env.DATABASE_URL
+  ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
+  : new Pool({
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      database: process.env.DB_NAME,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      ssl: { rejectUnauthorized: false },
+    });
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);

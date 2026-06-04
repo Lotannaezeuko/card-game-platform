@@ -1,15 +1,21 @@
 const { Pool } = require('pg');
 
+// Only use SSL for remote databases — local Postgres doesn't support it.
+const isRemote = process.env.DATABASE_URL &&
+  !process.env.DATABASE_URL.includes('localhost') &&
+  !process.env.DATABASE_URL.includes('127.0.0.1');
+const ssl = isRemote ? { rejectUnauthorized: false } : false;
+
 // Prefer a single DATABASE_URL (Neon/Railway style) over individual vars.
 const pool = process.env.DATABASE_URL
-  ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
+  ? new Pool({ connectionString: process.env.DATABASE_URL, ssl })
   : new Pool({
       host: process.env.DB_HOST,
       port: process.env.DB_PORT,
       database: process.env.DB_NAME,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
-      ssl: { rejectUnauthorized: false },
+      ssl,
     });
 
 pool.on('error', (err) => {

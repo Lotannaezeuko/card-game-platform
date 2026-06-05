@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { register, login, getMe, updatePassword, refreshToken } = require('../controllers/authController');
 
-jest.mock('bcrypt');
+jest.mock('bcryptjs');
 jest.mock('jsonwebtoken');
 jest.mock('../db');
 

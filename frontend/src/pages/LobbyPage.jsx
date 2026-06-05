@@ -18,6 +18,7 @@ export default function LobbyPage() {
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
   const [connectedPlayerIds, setConnectedPlayerIds] = useState(new Set());
+  const [copied, setCopied] = useState(false);
 
   const gameCodeRef = useRef(null);
   const navigateRef = useRef(navigate);
@@ -131,47 +132,51 @@ export default function LobbyPage() {
     }
   }
 
-  function copyCode() {
-    if (game?.game_code) navigator.clipboard.writeText(game.game_code);
+  function handleCopy() {
+    if (!game?.game_code) return;
+    navigator.clipboard.writeText(game.game_code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }
 
   if (error && !game) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-red-600 px-4">{error}</div>
+      <div className="min-h-screen bg-bg flex items-center justify-center text-error px-4">{error}</div>
     );
   }
 
   if (!game) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-400">Loading…</div>
+      <div className="min-h-screen bg-bg flex items-center justify-center text-textMuted">Loading…</div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-bg">
       <TopBar title="Lobby" />
 
       <div className="p-4 max-w-md mx-auto space-y-6">
         {/* Game code */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center shadow-sm">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Game code</p>
-          <p className="text-5xl font-black tracking-widest text-indigo-600 font-mono">
+        <div className="panel p-5 text-center">
+          <p className="text-xs uppercase tracking-widest text-textMuted mb-2">Game code</p>
+          <p className="text-5xl font-black tracking-widest text-accent font-mono break-all">
             {game.game_code}
           </p>
           <button
-            onClick={copyCode}
-            className="mt-3 text-xs text-gray-400 underline underline-offset-2"
+            onClick={handleCopy}
+            className="btn-secondary mt-4 px-4 py-2 text-xs"
           >
-            Tap to copy
+            {copied ? 'Copied!' : 'Tap to copy'}
           </button>
-          <p className="mt-3 text-sm text-gray-500">
+          <p className="mt-3 text-sm text-textMuted">
             Share this code with friends to let them join
           </p>
         </div>
 
         {/* Players */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
-          <p className="text-sm font-semibold text-gray-700 mb-3">
+        <div className="panel p-4">
+          <p className="text-sm font-semibold text-text mb-3">
             Players ({players.length})
           </p>
           <div className="flex flex-wrap gap-2">
@@ -183,39 +188,39 @@ export default function LobbyPage() {
               />
             ))}
             {players.length === 0 && (
-              <p className="text-sm text-gray-400">No players yet…</p>
+              <p className="text-sm text-textMuted">No players yet…</p>
             )}
           </div>
         </div>
 
         {/* Status / actions */}
         {error && (
-          <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>
+          <div className="p-3 bg-error/15 text-error rounded-lg text-sm">{error}</div>
         )}
 
         {isHost ? (
           <div className="space-y-3">
-            <p className="text-sm text-gray-500 text-center">
+            <p className="text-sm text-textMuted text-center">
               Start the game when all players have joined.
             </p>
             <button
               onClick={handleStartGame}
               disabled={starting || players.length < 1}
-              className="w-full py-3.5 bg-indigo-600 text-white font-semibold rounded-xl disabled:opacity-50 text-base"
+              className="btn-primary w-full py-3.5 text-base"
             >
               {starting ? 'Starting…' : 'Start Game'}
             </button>
           </div>
         ) : (
           <div className="text-center py-4 space-y-3">
-            <div className="inline-flex items-center gap-2 text-gray-500 text-sm">
-              <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 text-textMuted text-sm">
+              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
               Waiting for the host to start…
             </div>
             <div>
               <button
                 onClick={() => navigate(`/games/${gameId}/play`, { replace: true })}
-                className="text-xs text-gray-400 underline underline-offset-2"
+                className="text-xs text-textFaint underline underline-offset-2"
               >
                 Game already started? Tap here
               </button>
@@ -224,11 +229,32 @@ export default function LobbyPage() {
         )}
 
         {/* Deck info */}
-        <div className="text-center text-xs text-gray-400 space-y-0.5">
-          <p>Deck: <span className="font-medium text-gray-500">{game.deck_name}</span></p>
-          <p>Hand size: <span className="font-medium text-gray-500">{game.starting_hand_size}</span> · Turn: <span className="font-medium text-gray-500">{game.turn_direction}</span></p>
+        <div className="text-center text-xs text-textFaint space-y-0.5">
+          <p>Deck: <span className="font-medium text-textMuted">{game.deck_name}</span></p>
+          <p>Hand size: <span className="font-medium text-textMuted">{game.starting_hand_size}</span> · Turn: <span className="font-medium text-textMuted">{game.turn_direction}</span></p>
         </div>
       </div>
+
+      {/* Clipboard toast */}
+      {copied && (
+        <div style={{
+          position: 'fixed',
+          bottom: 'calc(var(--nav-height) + 16px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'var(--color-success)',
+          color: '#000',
+          padding: '10px 24px',
+          borderRadius: 'var(--radius-full)',
+          fontWeight: '600',
+          fontSize: 'var(--text-sm)',
+          zIndex: 1000,
+          boxShadow: 'var(--shadow-md)',
+          whiteSpace: 'nowrap'
+        }}>
+          Code copied!
+        </div>
+      )}
     </div>
   );
 }

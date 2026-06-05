@@ -30,7 +30,7 @@ export default function CardThumbnail({ card, onClick, onInspect, action, action
       {action && (
         <button
           onClick={() => action(card)}
-          className="w-full py-2 text-xs font-semibold text-blue-600 border-t border-gray-100 hover:bg-blue-50 transition-colors min-h-[44px]"
+          className="w-full py-2 text-xs font-semibold text-amber-700 border-t border-gray-100 hover:bg-amber-50 transition-colors min-h-[44px]"
         >
           {actionLabel || 'Add'}
         </button>

@@ -26,66 +26,83 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 px-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm p-8">
-        <h1 className="text-2xl font-bold text-gray-900 text-center mb-1">Card Game Platform</h1>
-        <p className="text-gray-500 text-center text-sm mb-8">Sign in to your account</p>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-bg px-4 py-8">
+      <div className="w-full max-w-sm">
+        <div className="flex flex-col items-center mb-8">
+          <BrandMark />
+          <h1 className="text-2xl font-bold text-text text-center mt-4">Wildcard</h1>
+          <p className="text-textMuted text-center text-sm mt-1">Sign in to your account</p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="you@example.com"
-            />
-          </div>
+        <div className="panel p-7">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-textMuted mb-1.5">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="field px-3 py-3 text-sm"
+                placeholder="you@example.com"
+              />
+            </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="••••••••"
-            />
-          </div>
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-textMuted mb-1.5">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                required
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                className="field px-3 py-3 text-sm"
+                placeholder="••••••••"
+              />
+            </div>
 
-          {error && (
-            <p className="text-red-600 text-sm">{error}</p>
-          )}
+            {error && (
+              <p className="text-error text-sm">{error}</p>
+            )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white rounded-lg py-3 text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2"
-          >
-            {loading ? 'Signing in…' : 'Log In'}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full py-3 text-sm mt-2"
+            >
+              {loading ? 'Signing in…' : 'Log In'}
+            </button>
+          </form>
+        </div>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
+        <p className="text-center text-sm text-textMuted mt-6">
           Don't have an account?{' '}
-          <Link to="/register" className="text-blue-600 font-medium hover:underline">
+          <Link to="/register" className="text-accent font-semibold hover:underline">
             Register
           </Link>
         </p>
-        <p className="text-center text-sm text-gray-400 mt-2">
-          <Link to="/join" className="hover:underline">
+        <p className="text-center text-sm text-textFaint mt-2">
+          <Link to="/join" className="text-accent/80 hover:underline">
             Join a game as a guest
           </Link>
         </p>
+      </div>
+    </div>
+  );
+}
+
+// Subtle card-stack brand mark shown above the auth forms
+function BrandMark() {
+  return (
+    <div className="relative w-14 h-14">
+      <div className="absolute inset-0 rounded-lg bg-surface3 border border-border rotate-[-8deg]" />
+      <div className="absolute inset-0 rounded-lg bg-surface2 border border-borderAccent rotate-[6deg] flex items-center justify-center">
+        <span className="text-accent text-2xl font-black">W</span>
       </div>
     </div>
   );

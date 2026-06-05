@@ -92,9 +92,7 @@ const createCard = async (req, res) => {
       return res.status(400).json({ error: 'Card name is required' });
     }
 
-    if (!front_text || front_text.trim() === '') {
-      return res.status(400).json({ error: 'Card front text is required' });
-    }
+    // front_text is optional — a card may have an image-only or blank front face.
 
     const result = await db.query(
       `INSERT INTO cards (created_by_user_id, card_name, front_text, front_image_url, back_text, back_image_url, default_copies, is_unique, attributes)
@@ -103,7 +101,7 @@ const createCard = async (req, res) => {
       [
         req.user.userId,
         card_name.trim(),
-        front_text.trim(),
+        front_text != null ? String(front_text).trim() : null,
         front_image_url || null,
         back_text || null,
         back_image_url || null,
@@ -164,7 +162,7 @@ const updateCard = async (req, res) => {
     }
     if (front_text !== undefined) {
       updates.push(`front_text = $${paramIndex++}`);
-      values.push(front_text.trim());
+      values.push(front_text != null ? String(front_text).trim() : null);
     }
     if (front_image_url !== undefined) {
       updates.push(`front_image_url = $${paramIndex++}`);

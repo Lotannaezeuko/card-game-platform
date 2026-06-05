@@ -163,24 +163,34 @@ describe('createCard', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Card name is required' });
   });
 
-  it('should return 400 if front_text is missing', async () => {
+  it('should create a card when front_text is missing (front text is optional)', async () => {
+    const newCard = { card_id: 1, card_name: 'Fireball', front_text: null };
+    db.query.mockResolvedValue({ rows: [newCard] });
+
     const req = { body: { card_name: 'Fireball' }, user: { userId: 1 } };
     const res = mockRes();
 
     await createCard(req, res);
 
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Card front text is required' });
+    // No front_text supplied -> stored as null, card is still created
+    const insertParams = db.query.mock.calls[0][1];
+    expect(insertParams[2]).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(201);
   });
 
-  it('should return 400 if front_text is empty string', async () => {
+  it('should create a card when front_text is an empty string', async () => {
+    const newCard = { card_id: 1, card_name: 'Fireball', front_text: '' };
+    db.query.mockResolvedValue({ rows: [newCard] });
+
     const req = { body: { card_name: 'Fireball', front_text: '  ' }, user: { userId: 1 } };
     const res = mockRes();
 
     await createCard(req, res);
 
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Card front text is required' });
+    // Whitespace-only front_text is trimmed to '' and the card is created
+    const insertParams = db.query.mock.calls[0][1];
+    expect(insertParams[2]).toBe('');
+    expect(res.status).toHaveBeenCalledWith(201);
   });
 
   it('should create a card successfully', async () => {

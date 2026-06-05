@@ -49,7 +49,6 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
   const isEdit = Boolean(cardId);
 
   const [activeTab, setActiveTab] = useState('front');
-  const [showRules, setShowRules] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState('');
@@ -170,13 +169,13 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
 
   async function handleSave() {
     if (!card.card_name.trim()) { setError('Card name is required.'); return; }
-    if (!card.front_text.trim()) { setError('Front text is required.'); return; }
+    // Front text is optional — a card can have an image-only (or blank) front face.
     setError('');
     setSaving(true);
     try {
       const body = {
         card_name: card.card_name,
-        front_text: card.front_text,
+        front_text: card.front_text || '',
         front_image_url: card.front_image_url || null,
         back_text: card.back_text || null,
         back_image_url: card.back_image_url || null,
@@ -201,46 +200,50 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="flex flex-col min-h-full bg-gray-50">
+    <div
+      className="flex flex-col h-screen bg-bg overflow-hidden"
+      style={{ paddingTop: 'var(--safe-top)' }}
+    >
       {/* Header */}
-      <header className="flex items-center justify-between px-4 h-14 bg-white border-b border-gray-100 sticky top-0 z-40">
-        <button onClick={onCancel} className="text-gray-500 text-sm font-medium min-h-[44px] flex items-center">
+      <header className="flex-none flex items-center justify-between px-4 h-14 bg-surface border-b border-border z-40">
+        <button onClick={onCancel} className="text-textMuted text-sm font-medium min-h-[44px] flex items-center">
           ← {isEdit ? 'Back' : 'Cancel'}
         </button>
-        <span className="font-semibold text-gray-900">{isEdit ? 'Edit Card' : 'New Card'}</span>
+        <span className="font-bold text-text">{isEdit ? 'Edit Card' : 'New Card'}</span>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="text-blue-600 text-sm font-semibold disabled:opacity-50 min-h-[44px] flex items-center"
+          className="text-accent text-sm font-semibold disabled:opacity-50 min-h-[44px] flex items-center"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
       </header>
 
-      <main className="flex-1 px-4 pt-6 pb-8 flex flex-col items-center gap-6">
-        {error && <p className="text-red-600 text-sm self-start">{error}</p>}
+      <main className="flex-1 min-h-0 overflow-y-auto px-4 pt-4 pb-6 flex flex-col items-center gap-4">
+        {error && <p className="text-error text-sm self-start">{error}</p>}
 
         {/* Card name */}
         <div className="w-full">
-          <label htmlFor="card_name" className="block text-sm font-medium text-gray-700 mb-1">Card Name</label>
+          <label htmlFor="card_name" className="block text-sm font-medium text-textMuted mb-1">Card Name</label>
           <input
             id="card_name"
             type="text"
             value={card.card_name}
             onChange={(e) => update('card_name', e.target.value)}
             placeholder="e.g. Lightning Bolt"
-            className="w-full border border-gray-300 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="field px-3 py-3 text-sm"
           />
         </div>
 
         {/* Front / Back tabs */}
-        <div className="flex w-full border border-gray-200 rounded-lg overflow-hidden">
+        <div className="flex w-full border border-border rounded-md overflow-hidden">
           {['front', 'back'].map((tab) => (
             <button
               key={tab}
+              type="button"
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
-                activeTab === tab ? 'bg-blue-600 text-white' : 'bg-white text-gray-600'
+              className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
+                activeTab === tab ? 'bg-accent text-black' : 'bg-surface2 text-textMuted'
               }`}
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -248,12 +251,9 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
           ))}
         </div>
 
-        {/* Interactive card preview — tap to upload image */}
-        <div
-          className="relative"
-          onClick={imageClickEnabled ? () => fileInputRef.current?.click() : undefined}
-          style={{ cursor: imageClickEnabled ? 'pointer' : 'default' }}
-        >
+        {/* Interactive card preview — tap the image area to upload, type on the
+            front face to edit the front text. */}
+        <div className="relative">
           <CardPreview
             frontText={card.front_text}
             frontImageUrl={card.front_image_url}
@@ -261,11 +261,14 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
             backImageUrl={card.back_image_url}
             attributes={card.attributes}
             showBack={!isFront}
+            editableFrontText={isFront}
+            onFrontTextChange={(value) => update('front_text', value)}
+            onImageClick={imageClickEnabled ? () => fileInputRef.current?.click() : undefined}
           />
           {/* Show camera hint only if image upload is active and no image set */}
           {imageClickEnabled && !currentImageUrl && !uploading && (
             <div className="absolute top-0 left-0 right-0 h-36 flex flex-col items-center justify-center pointer-events-none">
-              <CameraIcon className="w-8 h-8 text-gray-300" />
+              <CameraIcon className="w-8 h-8 text-gray-400" />
               <span className="text-xs text-gray-400 mt-1">Tap to add image</span>
             </div>
           )}
@@ -288,12 +291,12 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
           className="hidden"
           onChange={handleFileChange}
         />
-        {uploadError && <p className="text-red-600 text-xs self-start -mt-4">{uploadError}</p>}
+        {uploadError && <p className="text-error text-xs self-start -mt-2">{uploadError}</p>}
 
         {/* ── Back tab: Card Back Style section ─────────────────────── */}
         {!isFront && (
           <div className="w-full">
-            <p className="text-sm font-medium text-gray-700 mb-2">Card Back Style</p>
+            <p className="text-sm font-medium text-textMuted mb-2">Card Back Style</p>
             <div className="grid grid-cols-3 gap-2">
               {[
                 { id: 'custom',  label: 'Custom',        desc: 'Image or text' },
@@ -302,17 +305,18 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
               ].map(({ id, label, desc }) => (
                 <button
                   key={id}
+                  type="button"
                   onClick={() => handleBackStyleChange(id)}
-                  className={`flex flex-col items-center justify-center rounded-xl border-2 py-3 px-1 text-center transition-colors ${
+                  className={`flex flex-col items-center justify-center rounded-md border-2 py-3 px-1 text-center transition-colors ${
                     backStyle === id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 bg-white'
+                      ? 'border-borderAccent bg-accentMuted'
+                      : 'border-border bg-surface2'
                   }`}
                 >
-                  <span className={`text-xs font-semibold ${backStyle === id ? 'text-blue-700' : 'text-gray-700'}`}>
+                  <span className={`text-xs font-semibold ${backStyle === id ? 'text-accent' : 'text-text'}`}>
                     {label}
                   </span>
-                  <span className="text-xs text-gray-400 mt-0.5">{desc}</span>
+                  <span className="text-xs text-textMuted mt-0.5">{desc}</span>
                 </button>
               ))}
             </div>
@@ -320,17 +324,18 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
             {/* Colour swatches */}
             {backStyle === 'colour' && (
               <div className="mt-4">
-                <p className="text-xs font-medium text-gray-500 mb-2">Choose a colour</p>
+                <p className="text-xs font-medium text-textMuted mb-2">Choose a colour</p>
                 <div className="grid grid-cols-4 gap-2">
                   {PRESET_COLOURS.map(({ label, value }) => (
                     <button
                       key={value}
+                      type="button"
                       title={label}
                       onClick={() => updateAttr('backColour', value)}
                       className={`w-full aspect-square rounded-lg border-2 transition-transform ${
                         card.attributes.backColour === value
-                          ? 'border-blue-500 scale-110'
-                          : 'border-transparent hover:border-gray-300'
+                          ? 'border-accent scale-110'
+                          : 'border-transparent hover:border-border'
                       }`}
                       style={{ backgroundColor: value }}
                     >
@@ -342,14 +347,14 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
                 </div>
                 {/* Custom colour picker */}
                 <div className="mt-3 flex items-center gap-2">
-                  <label className="text-xs text-gray-500 flex-none">Custom:</label>
+                  <label className="text-xs text-textMuted flex-none">Custom:</label>
                   <input
                     type="color"
                     value={card.attributes.backColour || PRESET_COLOURS[0].value}
                     onChange={(e) => updateAttr('backColour', e.target.value)}
-                    className="w-10 h-8 rounded border border-gray-200 cursor-pointer p-0.5"
+                    className="w-10 h-8 rounded border border-border cursor-pointer p-0.5 bg-surface2"
                   />
-                  <span className="text-xs text-gray-400">{card.attributes.backColour || ''}</span>
+                  <span className="text-xs text-textFaint">{card.attributes.backColour || ''}</span>
                 </div>
               </div>
             )}
@@ -357,20 +362,21 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
             {/* Pattern tiles */}
             {backStyle === 'pattern' && (
               <div className="mt-4">
-                <p className="text-xs font-medium text-gray-500 mb-2">Choose a pattern</p>
+                <p className="text-xs font-medium text-textMuted mb-2">Choose a pattern</p>
                 <div className="grid grid-cols-3 gap-2">
                   {STOCK_PATTERNS.map(({ label, value }) => (
                     <button
                       key={value}
+                      type="button"
                       onClick={() => updateAttr('backPattern', value)}
-                      className={`flex flex-col items-center rounded-xl border-2 py-2 px-1 text-center transition-colors ${
+                      className={`flex flex-col items-center rounded-md border-2 py-2 px-1 text-center transition-colors ${
                         card.attributes.backPattern === value
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 bg-white hover:border-gray-300'
+                          ? 'border-borderAccent bg-accentMuted'
+                          : 'border-border bg-surface2 hover:border-textFaint'
                       }`}
                     >
                       <PatternThumbnail pattern={value} />
-                      <span className={`text-xs mt-1.5 font-medium ${card.attributes.backPattern === value ? 'text-blue-700' : 'text-gray-600'}`}>
+                      <span className={`text-xs mt-1.5 font-medium ${card.attributes.backPattern === value ? 'text-accent' : 'text-textMuted'}`}>
                         {label}
                       </span>
                     </button>
@@ -381,77 +387,58 @@ export default function CardBuilderForm({ cardId, onSaved, onCancel }) {
           </div>
         )}
 
-        {/* Text content — always shown; on back tab also shown under Custom or alongside any style */}
-        <div className="w-full">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {isFront ? 'Front Text' : 'Back Text'} {isFront && <span className="text-red-500">*</span>}
-          </label>
-          <textarea
-            value={isFront ? card.front_text : card.back_text}
-            onChange={(e) => update(isFront ? 'front_text' : 'back_text', e.target.value)}
-            placeholder={isFront ? 'What does this card say?' : 'Optional back content'}
-            rows={3}
-            className="w-full border border-gray-300 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-          />
-        </div>
-
-        {/* Paste image URL fallback — only relevant when image upload is active */}
-        {(isFront || backStyle === 'custom') && (
+        {/* Text content. Front text is edited directly on the card face above;
+            back text keeps its own optional input. */}
+        {isFront ? (
+          <p className="w-full text-xs text-textFaint">
+            Tip: tap the card face above to type the front text. It’s optional — leave it blank for an image-only card.
+          </p>
+        ) : (
           <div className="w-full">
-            <label className="block text-xs font-medium text-gray-400 mb-1">
-              Or paste image URL <span className="font-normal">(optional)</span>
-            </label>
-            <input
-              type="url"
-              value={currentImageUrl}
-              onChange={(e) => update(currentImageField, e.target.value)}
-              placeholder="https://example.com/image.jpg"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            <label className="block text-sm font-medium text-textMuted mb-1">Back Text</label>
+            <textarea
+              value={card.back_text}
+              onChange={(e) => update('back_text', e.target.value)}
+              placeholder="Optional back content"
+              rows={3}
+              className="field px-3 py-3 text-sm resize-none"
             />
           </div>
         )}
 
-        {/* Card Rules toggle */}
-        <button
-          onClick={() => setShowRules((s) => !s)}
-          className="self-start text-sm text-blue-600 font-medium"
-        >
-          {showRules ? 'Hide' : 'Show'} Card Rules
-        </button>
-
-        {showRules && (
-          <div className="w-full bg-white rounded-xl border border-gray-100 p-4 flex flex-col gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Default Copies per Deck</label>
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={card.default_copies}
-                onChange={(e) => update('default_copies', Number(e.target.value))}
-                className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-700">Unique Card</p>
-                <p className="text-xs text-gray-500">Only one copy can appear in a deck</p>
-              </div>
-              <button
-                onClick={() => update('is_unique', !card.is_unique)}
-                className={`w-12 h-6 rounded-full transition-colors ${card.is_unique ? 'bg-blue-600' : 'bg-gray-300'}`}
-                role="switch"
-                aria-checked={card.is_unique}
-              >
-                <span
-                  className={`block w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${
-                    card.is_unique ? 'translate-x-6' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
+        {/* Card Rules — always visible at the bottom */}
+        <div className="w-full panel p-4 flex flex-col gap-4 mt-auto">
+          <p className="text-sm font-semibold text-text">Card Rules</p>
+          <div>
+            <label className="block text-sm font-medium text-textMuted mb-1">Default Copies per Deck</label>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={card.default_copies}
+              onChange={(e) => update('default_copies', Number(e.target.value))}
+              className="field w-24 px-3 py-2 text-sm"
+            />
           </div>
-        )}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-text">Unique Card</p>
+              <p className="text-xs text-textMuted">Only one copy can appear in a deck</p>
+            </div>
+            <button
+              onClick={() => update('is_unique', !card.is_unique)}
+              className={`w-12 h-6 rounded-full transition-colors flex-none ${card.is_unique ? 'bg-accent' : 'bg-surface3'}`}
+              role="switch"
+              aria-checked={card.is_unique}
+            >
+              <span
+                className={`block w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${
+                  card.is_unique ? 'translate-x-6' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
       </main>
     </div>
   );

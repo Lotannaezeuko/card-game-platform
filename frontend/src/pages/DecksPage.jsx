@@ -5,6 +5,7 @@ import TopBar from '../components/layout/TopBar';
 import BottomNav from '../components/layout/BottomNav';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Modal from '../components/ui/Modal';
+import CardFaceThumbnail from '../components/cards/CardFaceThumbnail';
 
 export default function DecksPage() {
   const navigate = useNavigate();
@@ -32,18 +33,18 @@ export default function DecksPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-bg">
       <TopBar title="My Decks" />
-      <main className="flex-1 px-4 pt-6 pb-24">
+      <main className="flex-1 px-4 pt-6" style={{ paddingBottom: 'calc(var(--nav-height) + 2rem)' }}>
         {loading && <LoadingSpinner />}
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && <p className="text-error text-sm">{error}</p>}
 
         {!loading && !error && decks.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-gray-400 text-sm mb-4">No decks yet. Build your first one!</p>
+            <p className="text-textMuted text-sm mb-4">No decks yet. Build your first one!</p>
             <button
               onClick={() => navigate('/decks/new')}
-              className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+              className="btn-primary px-5 py-2.5 text-sm"
             >
               Build Deck
             </button>
@@ -51,34 +52,43 @@ export default function DecksPage() {
         )}
 
         {!loading && decks.length > 0 && (
-          <ul className="flex flex-col gap-3">
+          <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {decks.map((deck) => (
-              <li
-                key={deck.deck_id}
-                className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-4 flex items-center justify-between"
-              >
-                <div>
-                  <p className="font-semibold text-gray-900 text-sm">{deck.deck_name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {deck.card_count ?? '—'} cards
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => navigate(`/decks/${deck.deck_id}/edit`)}
-                    className="text-blue-600 text-sm font-medium min-h-[44px] px-2"
-                    aria-label="Edit deck"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => setDeleteTarget(deck)}
-                    className="text-red-500 text-sm font-medium min-h-[44px] px-2"
-                    aria-label="Delete deck"
-                  >
-                    Delete
-                  </button>
-                </div>
+              <li key={deck.deck_id} className="relative group">
+                <button
+                  onClick={() => navigate(`/decks/${deck.deck_id}/edit`)}
+                  className="w-full panel overflow-hidden flex flex-col text-left transition-colors hover:border-borderAccent"
+                  aria-label={`Open ${deck.deck_name}`}
+                >
+                  {/* Thumbnail — the deck's first card face (image or text on white) */}
+                  <div className="relative aspect-[3/4] w-full">
+                    <CardFaceThumbnail
+                      imageUrl={deck.cover_image_url}
+                      text={deck.cover_text}
+                      name={deck.deck_name}
+                      textClassName="text-sm font-semibold"
+                      className="w-full h-full"
+                    />
+                    {/* Card count badge */}
+                    <span className="absolute top-2 right-2 bg-accentMuted text-accent text-[11px] font-bold px-2 py-0.5 rounded-full shadow">
+                      {deck.card_count ?? 0}
+                    </span>
+                  </div>
+                  <div className="px-3 py-2.5">
+                    <p className="font-semibold text-text text-sm truncate">{deck.deck_name}</p>
+                    <p className="text-xs text-textMuted mt-0.5">
+                      {deck.card_count ?? '—'} {deck.card_count === 1 ? 'card' : 'cards'}
+                    </p>
+                  </div>
+                </button>
+                {/* Delete overlay button */}
+                <button
+                  onClick={() => setDeleteTarget(deck)}
+                  className="absolute top-2 left-2 w-7 h-7 rounded-full bg-bg/70 backdrop-blur border border-border flex items-center justify-center text-error text-base leading-none hover:bg-error hover:text-white transition-colors"
+                  aria-label="Delete deck"
+                >
+                  ×
+                </button>
               </li>
             ))}
           </ul>
@@ -88,7 +98,8 @@ export default function DecksPage() {
       {/* FAB */}
       <button
         onClick={() => navigate('/decks/new')}
-        className="fixed bottom-20 right-4 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center text-2xl hover:bg-blue-700 transition-colors z-40"
+        className="fixed right-4 w-14 h-14 bg-accent text-black rounded-full shadow-[var(--shadow-accent)] flex items-center justify-center text-2xl hover:bg-accentHover transition-colors z-40"
+        style={{ bottom: 'calc(var(--nav-height) + var(--safe-bottom) + 16px)' }}
         aria-label="Build new deck"
       >
         +

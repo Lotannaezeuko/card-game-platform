@@ -33,11 +33,20 @@ export default function GamePage() {
   const [flippedCardId, setFlippedCardId] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null); // 'reshuffle' | 'endgame'
   const [hideDiscardPile, setHideDiscardPile] = useState(false);
+  const [deckBack, setDeckBack] = useState(null);
   const [boardCards, setBoardCards] = useState([]);
   const [boardScale, setBoardScale] = useState(1);
   const [showBoard, setShowBoard] = useState(false);
   const [activeDragCard, setActiveDragCard] = useState(null);
   const [toasts, addToast] = useToasts();
+  const [showLandscapeHint, setShowLandscapeHint] = useState(false);
+
+  // Suggest landscape on small portrait screens (dismissible)
+  useEffect(() => {
+    if (window.innerWidth < 768 && window.innerHeight > window.innerWidth) {
+      setShowLandscapeHint(true);
+    }
+  }, []);
 
   // Stable refs so socket handlers always see latest values without re-running the effect
   const playersRef = useRef(players);
@@ -75,6 +84,7 @@ export default function GamePage() {
         setCurrentPlayerPos(gameData.game.current_player_position ?? 1);
         setHand(handData.hand || []);
         setFlippedCardId(null);
+        setDeckBack(gameData.deck_back || null);
         if (gameData.discard_top) setDiscardTop(gameData.discard_top);
         setBoardCards(gameData.game.game_state?.board || []);
         // All players read hideDiscardPile from game_state (host writes it there after deck fetch)
@@ -375,18 +385,35 @@ export default function GamePage() {
 
   if (!game) {
     return (
-      <div className="h-screen w-screen bg-slate-900 flex items-center justify-center">
-        <span className="text-slate-400 text-sm">Loading game…</span>
+      <div className="h-screen w-screen bg-bg flex items-center justify-center">
+        <span className="text-textMuted text-sm">Loading game…</span>
       </div>
     );
   }
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-    <div className="h-screen w-screen bg-slate-900 overflow-hidden flex flex-col select-none">
+    <div
+      className="h-screen w-screen bg-bg overflow-hidden flex flex-col select-none"
+      style={{ paddingTop: 'var(--safe-top)' }}
+    >
+
+      {/* ── Landscape hint banner ── */}
+      {showLandscapeHint && (
+        <div className="flex-none flex items-center justify-between gap-3 px-3 py-2 bg-accent text-black text-xs font-semibold">
+          <span>Rotate your device for the best experience</span>
+          <button
+            onClick={() => setShowLandscapeHint(false)}
+            className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-black/10 text-base leading-none flex-none"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* ── Top strip: players + game code ── */}
-      <div className="flex-none h-11 px-3 flex items-center justify-between border-b border-slate-700">
+      <div className="flex-none h-11 px-3 flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
           {players.map((p) => (
             <PlayerChip
@@ -400,14 +427,14 @@ export default function GamePage() {
         <div className="flex items-center gap-2 ml-2 flex-none">
           <button
             onClick={() => setShowBoard((v) => !v)}
-            className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded"
+            className="text-xs btn-secondary px-3 py-1.5 min-h-0 rounded-md"
           >
-            {showBoard ? 'Piles' : 'Board'}
+            {showBoard ? '← Piles' : 'Board →'}
           </button>
-          <span className="text-xs text-slate-500 font-mono tracking-wider">{game.game_code}</span>
+          <span className="text-xs text-textFaint font-mono tracking-wider">{game.game_code}</span>
           <button
             onClick={() => navigate('/home')}
-            className="text-slate-500 hover:text-slate-300 text-lg leading-none"
+            className="text-textMuted hover:text-text text-lg leading-none"
             title="Leave game"
           >
             ×
@@ -434,19 +461,20 @@ export default function GamePage() {
         <div className={`${showBoard ? 'hidden' : 'flex'} flex-1 min-h-0`}>
 
         {/* Centre: discard + draw */}
-        <div className="flex-1 flex items-center justify-center gap-6">
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-xs text-slate-400">Discard</span>
-            <DiscardPile card={discardTop} hidden={hideDiscardPile} />
+        <div className="flex-1 flex items-center justify-center gap-8">
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-textMuted">Discard</span>
+            <DiscardPile card={discardTop} hidden={hideDiscardPile} backCard={deckBack} />
           </div>
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-xs text-slate-400">Draw</span>
-            <DrawPileCard />
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-textMuted">Draw</span>
+            <DrawPileCard backCard={deckBack} />
           </div>
         </div>
 
-        {/* Right panel: actions */}
-        <div className="w-28 flex-none flex flex-col justify-start overflow-y-auto gap-1 pr-2 py-2">
+        {/* Right panel: actions (scrolls with a fade hint when actions overflow) */}
+        <div className="w-28 flex-none relative">
+          <div className="absolute inset-0 flex flex-col justify-start overflow-y-auto gap-1 pr-2 py-2 scrollbar-hide">
           {isMyTurn ? (
             <>
               <ActionBtn
@@ -481,14 +509,14 @@ export default function GamePage() {
             </>
           ) : (
             <div className="text-center px-1">
-              <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse mx-auto mb-2" />
-              <p className="text-xs text-slate-400 leading-snug">
+              <div className="w-2 h-2 rounded-full bg-accent animate-pulse mx-auto mb-2" />
+              <p className="text-xs text-textMuted leading-snug">
                 {currentPlayer ? `${currentPlayer.username}'s turn` : 'Waiting…'}
               </p>
             </div>
           )}
 
-          <div className="border-t border-slate-700 mt-0.5 mb-0.5" />
+          <div className="border-t border-border mt-0.5 mb-0.5" />
           <ActionBtn label="Scores" onClick={() => setShowScoreboard(true)} color="slate" />
 
           {isHost && (
@@ -498,12 +526,15 @@ export default function GamePage() {
               <ActionBtn label="End Game" onClick={handleEndGame} color="red" />
             </>
           )}
-        </div>
+          </div>{/* end scrollable actions */}
+          {/* Fade-out gradient hints that the action list scrolls */}
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-bg to-transparent" />
+        </div>{/* end right action panel */}
         </div>{/* end piles + actions wrapper */}
       </div>{/* end middle */}
 
       {/* ── Bottom: hand ── */}
-      <div className="flex-none border-t border-slate-700">
+      <div className="flex-none border-t border-border" style={{ paddingBottom: 'var(--safe-bottom)' }}>
         <HandRow
           hand={hand}
           selectedId={selectedCardId}
@@ -549,11 +580,11 @@ export default function GamePage() {
 
       {/* ── Adjust Turn modal ── */}
       {showAdjustTurn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-white rounded-2xl shadow-xl w-72 mx-4 overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h2 className="text-base font-bold text-gray-900">Set Turn</h2>
-              <button onClick={() => setShowAdjustTurn(false)} className="text-gray-400 text-xl leading-none">×</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="panel shadow-lg w-72 max-w-full overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h2 className="text-base font-bold text-text">Set Turn</h2>
+              <button onClick={() => setShowAdjustTurn(false)} className="text-textMuted text-xl leading-none">×</button>
             </div>
             <div className="px-5 py-3 space-y-2">
               {players.map((p) => (
@@ -562,8 +593,8 @@ export default function GamePage() {
                   onClick={() => handleAdjustTurn(p.player_position)}
                   className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                     p.player_position === effectivePos
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                      ? 'bg-accent text-black'
+                      : 'bg-surface3 text-text hover:bg-surface'
                   }`}
                 >
                   {p.username}
@@ -605,9 +636,9 @@ function ActionBtn({ label, onClick, disabled = false, color = 'slate' }) {
   const colors = {
     indigo: 'bg-indigo-600 hover:bg-indigo-500 text-white',
     emerald: 'bg-emerald-600 hover:bg-emerald-500 text-white',
-    amber: 'bg-amber-500 hover:bg-amber-400 text-white',
-    red: 'bg-red-600 hover:bg-red-500 text-white',
-    slate: 'bg-slate-700 hover:bg-slate-600 text-slate-200',
+    amber: 'bg-accent hover:bg-accentHover text-black',
+    red: 'bg-error hover:opacity-90 text-white',
+    slate: 'bg-surface3 hover:bg-surface text-text',
   };
 
   return (

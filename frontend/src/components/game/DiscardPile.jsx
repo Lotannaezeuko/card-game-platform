@@ -1,33 +1,50 @@
 import CardBack from '../cards/CardBack';
 
-// card:   { card_name, front_text, front_image_url } | null
-// hidden: when true and card is not null, shows a face-down stack instead of the card face
-export default function DiscardPile({ card, hidden = false }) {
+// Renders a face-down card back from a representative deck card.
+// backCard: { back_image_url, attributes: { backColour, backPattern } } | null
+// Priority mirrors FlippableCard's back face: custom image > colour/pattern > default.
+function CardBackFace({ backCard }) {
+  const backImageUrl = backCard?.back_image_url || null;
+  if (backImageUrl) {
+    return <img src={backImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />;
+  }
+  return (
+    <CardBack
+      backColour={backCard?.attributes?.backColour || null}
+      backPattern={backCard?.attributes?.backPattern || null}
+    />
+  );
+}
+
+// card:     { card_name, front_text, front_image_url } | null
+// hidden:   when true and card is not null, shows a face-down stack instead of the card face
+// backCard: representative deck card used to render the back design
+export default function DiscardPile({ card, hidden = false, backCard }) {
   if (!card) {
     return (
-      <div className="w-20 h-28 rounded-xl border-2 border-dashed border-slate-600 flex items-center justify-center">
-        <span className="text-slate-500 text-xs text-center leading-tight px-1">Empty</span>
+      <div className="w-24 h-36 rounded-xl border-2 border-dashed border-border flex items-center justify-center">
+        <span className="text-textFaint text-xs text-center leading-tight px-1">Empty</span>
       </div>
     );
   }
 
   if (hidden) {
-    // Face-down stack: two offset shadow cards + the top card showing CardBack
+    // Face-down stack: two offset shadow cards + the top card showing the deck's back
     return (
-      <div className="relative w-20 h-28">
+      <div className="relative w-24 h-36">
         {/* Stack shadow cards */}
-        <div className="absolute inset-0 rounded-xl bg-indigo-950 border border-indigo-800 translate-x-1 translate-y-1" />
-        <div className="absolute inset-0 rounded-xl bg-indigo-950 border border-indigo-800 translate-x-0.5 translate-y-0.5" />
+        <div className="absolute inset-0 rounded-xl bg-surface border border-border translate-x-1 translate-y-1" />
+        <div className="absolute inset-0 rounded-xl bg-surface border border-border translate-x-0.5 translate-y-0.5" />
         {/* Top face-down card */}
         <div className="absolute inset-0 rounded-xl overflow-hidden shadow-md">
-          <CardBack />
+          <CardBackFace backCard={backCard} />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-20 h-28 rounded-xl bg-white border-2 border-slate-300 shadow-md flex flex-col overflow-hidden">
+    <div className="w-24 h-36 rounded-xl bg-white border-2 border-slate-300 shadow-lg flex flex-col overflow-hidden">
       <div className="bg-slate-100 px-1.5 py-1 border-b border-slate-200">
         <p className="text-xs font-semibold text-slate-700 truncate">{card.card_name}</p>
       </div>
@@ -42,20 +59,24 @@ export default function DiscardPile({ card, hidden = false }) {
   );
 }
 
-// Face-down draw pile card
-export function DrawPileCard({ empty }) {
+// Face-down draw pile — shows the deck's card-back design as a stack
+export function DrawPileCard({ empty, backCard }) {
   if (empty) {
     return (
-      <div className="w-20 h-28 rounded-xl border-2 border-dashed border-slate-600 flex items-center justify-center">
-        <span className="text-slate-500 text-xs">Empty</span>
+      <div className="w-24 h-36 rounded-xl border-2 border-dashed border-border flex items-center justify-center">
+        <span className="text-textFaint text-xs">Empty</span>
       </div>
     );
   }
 
   return (
-    <div className="w-20 h-28 rounded-xl bg-indigo-800 border-2 border-indigo-600 shadow-md flex items-center justify-center">
-      <div className="w-14 h-20 rounded-lg border border-indigo-500 flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-indigo-400 opacity-50" />
+    <div className="relative w-24 h-36">
+      {/* Stacked shadow cards for depth */}
+      <div className="absolute inset-0 rounded-xl bg-surface border border-border translate-x-1 translate-y-1" />
+      <div className="absolute inset-0 rounded-xl bg-surface border border-border translate-x-0.5 translate-y-0.5" />
+      {/* Top face-down card showing the deck's designed back */}
+      <div className="absolute inset-0 rounded-xl overflow-hidden shadow-lg">
+        <CardBackFace backCard={backCard} />
       </div>
     </div>
   );

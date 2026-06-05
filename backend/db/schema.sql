@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS cards (
   card_id SERIAL PRIMARY KEY,
   created_by_user_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
   card_name VARCHAR(100) NOT NULL,
-  front_text TEXT,
+  front_text TEXT DEFAULT '',
   front_image_url VARCHAR(500),
   back_text TEXT,
   back_image_url VARCHAR(500),

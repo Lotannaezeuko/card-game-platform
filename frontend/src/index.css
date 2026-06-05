@@ -1,3 +1,5 @@
+@import './styles/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,12 +8,106 @@
   box-sizing: border-box;
 }
 
+html, body {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prevent Safari iOS from zooming when focusing form fields (font-size < 16px) */
+input, textarea, select {
+  font-size: max(16px, 1em);
 }
 
 #root {
   min-height: 100vh;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Reusable token-driven component classes (Task 5)
+   Used across screens so the dark "card game product" styling is
+   consistent. Components apply these alongside Tailwind utilities.
+   ───────────────────────────────────────────────────────────── */
+@layer components {
+  /* Primary action button — amber on black */
+  .btn-primary {
+    background: var(--color-accent);
+    color: #000;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    min-height: var(--touch-min);
+    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--color-accent-hover); }
+  .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* Secondary / neutral button */
+  .btn-secondary {
+    background: var(--color-surface-3);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    min-height: var(--touch-min);
+    transition: background 0.15s ease;
+  }
+  .btn-secondary:hover:not(:disabled) { background: var(--color-surface-2); }
+  .btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* Panels / cards */
+  .panel {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+
+  /* Token-styled form fields */
+  .field {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    border-radius: var(--radius-md);
+    width: 100%;
+  }
+  .field::placeholder { color: var(--color-text-faint); }
+  .field:focus {
+    border-color: var(--color-accent);
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-accent-muted);
+  }
+  .field option { background: var(--color-surface-2); color: var(--color-text); }
+}
+
+/* Placeholder for empty contenteditable card-face text (light card, dark text) */
+[contenteditable].ce-placeholder:empty:before {
+  content: attr(data-placeholder);
+  color: #9CA3AF;
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* Board dot-grid pattern (game screen) */
+.board-dotgrid {
+  background-color: var(--color-bg);
+  background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Hide scrollbars on horizontal strips (player chips, hand) */
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
+/* Simple fade-in used by toasts */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+.animate-fade-in { animation: fade-in 0.2s ease-out; }

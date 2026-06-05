@@ -162,7 +162,21 @@ const getGameById = async (req, res) => {
 
     const discard_top = discardResult.rows.length > 0 ? discardResult.rows[0] : null;
 
-    res.json({ game, players: playerResult.rows, discard_top });
+    // Representative card back for this deck — used to render the face-down draw
+    // pile (and hidden discard) with the back design the player actually made,
+    // rather than a generic placeholder. Uses the deck's first card.
+    const deckBackResult = await db.query(
+      `SELECT c.back_image_url, c.attributes
+       FROM deck_cards dc
+       JOIN cards c ON c.card_id = dc.card_id
+       WHERE dc.deck_id = $1
+       ORDER BY dc.card_order ASC NULLS LAST, c.card_name ASC
+       LIMIT 1`,
+      [game.deck_id]
+    );
+    const deck_back = deckBackResult.rows.length > 0 ? deckBackResult.rows[0] : null;
+
+    res.json({ game, players: playerResult.rows, discard_top, deck_back });
   } catch (error) {
     console.error('Get game by id error:', error);
     res.status(500).json({ error: 'Internal server error' });

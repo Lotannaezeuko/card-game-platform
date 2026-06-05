@@ -58,18 +58,18 @@ export default function CardsPage() {
   const hasMore = cards.length < total;
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-bg">
       <TopBar title="My Cards" />
-      <main className="flex-1 px-4 pt-6 pb-24">
+      <main className="flex-1 px-4 pt-6" style={{ paddingBottom: 'calc(var(--nav-height) + 2rem)' }}>
         {loading && <LoadingSpinner />}
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && <p className="text-error text-sm">{error}</p>}
 
         {!loading && !error && cards.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-gray-400 text-sm mb-4">No cards yet. Create your first one!</p>
+            <p className="text-textMuted text-sm mb-4">No cards yet. Create your first one!</p>
             <button
               onClick={() => navigate('/cards/new')}
-              className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+              className="btn-primary px-5 py-2.5 text-sm"
             >
               Create Card
             </button>
@@ -78,7 +78,7 @@ export default function CardsPage() {
 
         {!loading && cards.length > 0 && (
           <>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {cards.map((card) => (
                 <div key={card.card_id} className="relative">
                   <FlippableCard
@@ -101,7 +101,7 @@ export default function CardsPage() {
                   {/* Edit */}
                   <button
                     onClick={() => navigate(`/cards/${card.card_id}/edit`)}
-                    className="absolute top-2 left-2 w-7 h-7 bg-white rounded-full shadow border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-sm"
+                    className="absolute top-2 left-2 w-7 h-7 bg-bg/70 backdrop-blur rounded-full shadow border border-border flex items-center justify-center text-textMuted hover:text-accent text-sm"
                     aria-label="Edit card"
                   >
                     ✎
@@ -109,7 +109,7 @@ export default function CardsPage() {
                   {/* Delete */}
                   <button
                     onClick={() => setDeleteTarget(card)}
-                    className="absolute top-2 right-2 w-7 h-7 bg-white rounded-full shadow border border-gray-200 flex items-center justify-center text-red-400 hover:bg-red-50 text-sm"
+                    className="absolute top-2 right-2 w-7 h-7 bg-bg/70 backdrop-blur rounded-full shadow border border-border flex items-center justify-center text-error hover:bg-error hover:text-white text-sm"
                     aria-label="Delete card"
                   >
                     ×
@@ -123,7 +123,7 @@ export default function CardsPage() {
                 <button
                   onClick={loadMore}
                   disabled={loadingMore}
-                  className="px-6 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                  className="btn-secondary px-6 py-2.5 text-sm disabled:opacity-50"
                 >
                   {loadingMore ? 'Loading…' : `See more (${total - cards.length} remaining)`}
                 </button>
@@ -136,7 +136,8 @@ export default function CardsPage() {
       {/* FAB */}
       <button
         onClick={() => navigate('/cards/new')}
-        className="fixed bottom-20 right-4 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center text-2xl hover:bg-blue-700 transition-colors z-40"
+        className="fixed right-4 w-14 h-14 bg-accent text-black rounded-full shadow-[var(--shadow-accent)] flex items-center justify-center text-2xl hover:bg-accentHover transition-colors z-40"
+        style={{ bottom: 'calc(var(--nav-height) + var(--safe-bottom) + 16px)' }}
         aria-label="Create new card"
       >
         +

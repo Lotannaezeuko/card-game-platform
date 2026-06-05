@@ -14,15 +14,18 @@ export default function BottomNav() {
   if (hideOnPaths.some((r) => r.test(location.pathname))) return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
+    <nav
+      className="fixed bottom-0 left-0 right-0 bg-surface border-t border-border z-50"
+      style={{ paddingBottom: 'var(--safe-bottom)' }}
+    >
       <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
         {tabs.map(({ label, path, icon: Icon }) => (
           <NavLink
             key={path}
             to={path}
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs font-medium transition-colors ${
-                isActive ? 'text-blue-600' : 'text-gray-500'
+              `flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs font-semibold transition-colors ${
+                isActive ? 'text-accent' : 'text-textMuted'
               }`
             }
           >

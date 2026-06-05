@@ -110,14 +110,15 @@ describe('getGameById', () => {
     db.query
       .mockResolvedValueOnce({ rows: [game] })
       .mockResolvedValueOnce({ rows: players })
-      .mockResolvedValueOnce({ rows: [] }); // discard top (empty)
+      .mockResolvedValueOnce({ rows: [] }) // discard top (empty)
+      .mockResolvedValueOnce({ rows: [] }); // deck back (empty)
 
     const req = { params: { game_id: 1 }, user: { userId: 1 } };
     const res = mockRes();
 
     await getGameById(req, res);
 
-    expect(res.json).toHaveBeenCalledWith({ game, players, discard_top: null });
+    expect(res.json).toHaveBeenCalledWith({ game, players, discard_top: null, deck_back: null });
   });
 
   it('should return game with players for non-host player', async () => {
@@ -127,14 +128,15 @@ describe('getGameById', () => {
     db.query
       .mockResolvedValueOnce({ rows: [game] })
       .mockResolvedValueOnce({ rows: players })
-      .mockResolvedValueOnce({ rows: [] }); // discard top (empty)
+      .mockResolvedValueOnce({ rows: [] }) // discard top (empty)
+      .mockResolvedValueOnce({ rows: [] }); // deck back (empty)
 
     const req = { params: { game_id: 1 }, user: { userId: 1 } };
     const res = mockRes();
 
     await getGameById(req, res);
 
-    expect(res.json).toHaveBeenCalledWith({ game, players, discard_top: null });
+    expect(res.json).toHaveBeenCalledWith({ game, players, discard_top: null, deck_back: null });
   });
 
   it('should return 500 on database error', async () => {

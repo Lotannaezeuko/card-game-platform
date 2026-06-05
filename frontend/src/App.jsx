@@ -18,7 +18,7 @@ import EndSessionPage from './pages/EndSessionPage';
 
 // Placeholder pages — to be built in later phases
 const Placeholder = ({ name }) => (
-  <div className="flex items-center justify-center min-h-screen text-gray-500">{name} — coming soon</div>
+  <div className="flex items-center justify-center min-h-screen bg-bg text-textMuted">{name} — coming soon</div>
 );
 
 export default function App() {

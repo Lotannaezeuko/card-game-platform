@@ -10,17 +10,31 @@ const getAllDecks = async (req, res) => {
     let query;
     let params;
 
+    // Lateral subquery: the deck's first card (by order, then name) used as a
+    // cover thumbnail in the My Decks / public deck grids.
+    const coverJoin = `
+        LEFT JOIN LATERAL (
+          SELECT c.front_image_url, c.front_text
+          FROM deck_cards dc2
+          JOIN cards c ON dc2.card_id = c.card_id
+          WHERE dc2.deck_id = d.deck_id
+          ORDER BY dc2.card_order ASC NULLS LAST, c.card_name ASC
+          LIMIT 1
+        ) cover ON true`;
+
     if (is_public === 'true') {
       query = `
         SELECT d.deck_id, d.user_id, d.deck_name, d.description, d.is_public,
                d.total_cards, d.unique_cards, d.shuffle_behaviour, d.duplicate_handling,
                d.created_at, d.updated_at, u.username,
-               COALESCE(SUM(dc.quantity), 0)::int AS card_count
+               COALESCE(SUM(dc.quantity), 0)::int AS card_count,
+               cover.front_image_url AS cover_image_url, cover.front_text AS cover_text
         FROM decks d
         LEFT JOIN deck_cards dc ON d.deck_id = dc.deck_id
         LEFT JOIN users u ON d.user_id = u.user_id
+        ${coverJoin}
         WHERE d.is_public = true
-        GROUP BY d.deck_id, u.username
+        GROUP BY d.deck_id, u.username, cover.front_image_url, cover.front_text
         ORDER BY d.created_at DESC
       `;
       params = [];
@@ -30,12 +44,14 @@ const getAllDecks = async (req, res) => {
         SELECT d.deck_id, d.user_id, d.deck_name, d.description, d.is_public,
                d.total_cards, d.unique_cards, d.shuffle_behaviour, d.duplicate_handling,
                d.created_at, d.updated_at,
-               COALESCE(SUM(dc.quantity), 0)::int AS card_count
+               COALESCE(SUM(dc.quantity), 0)::int AS card_count,
+               cover.front_image_url AS cover_image_url, cover.front_text AS cover_text
         FROM decks d
         LEFT JOIN deck_cards dc ON d.deck_id = dc.deck_id
+        ${coverJoin}
         WHERE d.user_id = $1
            OR d.deck_id IN (SELECT deck_id FROM user_decks WHERE user_id = $1)
-        GROUP BY d.deck_id
+        GROUP BY d.deck_id, cover.front_image_url, cover.front_text
         ORDER BY d.created_at DESC
       `;
       params = [req.user.userId];

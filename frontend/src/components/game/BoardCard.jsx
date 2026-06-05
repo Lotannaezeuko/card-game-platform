@@ -36,7 +36,7 @@ export default function BoardCard({ card }) {
         onSelect={() => setIsFlipped((f) => !f)}
         size="hand"
       />
-      <p className="text-center text-xs text-slate-400 mt-0.5 truncate w-20">
+      <p className="text-center text-xs text-textMuted mt-0.5 truncate w-20">
         {card.placedBy}
       </p>
     </div>

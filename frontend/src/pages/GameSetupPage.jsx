@@ -7,7 +7,7 @@ import BottomNav from '../components/layout/BottomNav';
 export default function GameSetupPage() {
   const navigate = useNavigate();
   const { state: navState } = useLocation();
-  const [tab, setTab] = useState('host'); // 'host' | 'join'
+  const [tab, setTab] = useState(navState?.tab === 'join' ? 'join' : 'host'); // 'host' | 'join'
 
   // Host form state
   const [decks, setDecks] = useState([]);
@@ -80,23 +80,23 @@ export default function GameSetupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-16">
+    <div className="min-h-screen bg-bg" style={{ paddingBottom: 'calc(var(--nav-height) + 1rem)' }}>
       <TopBar title="Games" />
 
       <div className="p-4 max-w-md mx-auto">
         {/* Tab switcher */}
-        <div className="flex rounded-xl overflow-hidden border border-gray-200 mb-6">
+        <div className="flex rounded-md overflow-hidden border border-border mb-6">
           <button
-            className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
-              tab === 'host' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600'
+            className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
+              tab === 'host' ? 'bg-accent text-black' : 'bg-surface2 text-textMuted'
             }`}
             onClick={() => { setTab('host'); setError(''); }}
           >
             Host a Game
           </button>
           <button
-            className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
-              tab === 'join' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600'
+            className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
+              tab === 'join' ? 'bg-accent text-black' : 'bg-surface2 text-textMuted'
             }`}
             onClick={() => { setTab('join'); setError(''); }}
           >
@@ -105,18 +105,18 @@ export default function GameSetupPage() {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>
+          <div className="mb-4 p-3 bg-error/15 text-error rounded-lg text-sm">{error}</div>
         )}
 
         {tab === 'host' ? (
           <form onSubmit={handleHost} className="space-y-5">
             {/* Deck */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Deck</label>
+              <label className="block text-sm font-medium text-textMuted mb-1">Deck</label>
               <select
                 value={deckId}
                 onChange={(e) => setDeckId(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="field px-3 py-2.5 text-sm"
               >
                 <option value="">Select a deck…</option>
                 {decks.map((d) => (
@@ -127,36 +127,36 @@ export default function GameSetupPage() {
 
             {/* Hand size */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Starting hand size: <span className="font-bold text-indigo-600">{handSize}</span>
+              <label className="block text-sm font-medium text-textMuted mb-1">
+                Starting hand size: <span className="font-bold text-accent">{handSize}</span>
               </label>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setHandSize((v) => Math.max(0, v - 1))}
-                  className="w-10 h-10 rounded-full border border-gray-300 text-lg font-bold text-gray-600 flex items-center justify-center"
+                  className="w-10 h-10 rounded-full border border-border text-lg font-bold text-text flex items-center justify-center hover:bg-surface3"
                 >−</button>
-                <div className="flex-1 h-2 bg-gray-200 rounded-full">
+                <div className="flex-1 h-2 bg-surface3 rounded-full">
                   <div
-                    className="h-2 bg-indigo-500 rounded-full transition-all"
+                    className="h-2 bg-accent rounded-full transition-all"
                     style={{ width: `${Math.min((handSize / 15) * 100, 100)}%` }}
                   />
                 </div>
                 <button
                   type="button"
                   onClick={() => setHandSize((v) => Math.min(15, v + 1))}
-                  className="w-10 h-10 rounded-full border border-gray-300 text-lg font-bold text-gray-600 flex items-center justify-center"
+                  className="w-10 h-10 rounded-full border border-border text-lg font-bold text-text flex items-center justify-center hover:bg-surface3"
                 >+</button>
               </div>
             </div>
 
             {/* Turn direction */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Turn direction</label>
+              <label className="block text-sm font-medium text-textMuted mb-1">Turn direction</label>
               <select
                 value={turnDirection}
                 onChange={(e) => setTurnDirection(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="field px-3 py-2.5 text-sm"
               >
                 <option value="clockwise">Clockwise</option>
                 <option value="counterclockwise">Counterclockwise</option>
@@ -165,11 +165,11 @@ export default function GameSetupPage() {
 
             {/* Deal method */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Deal method</label>
+              <label className="block text-sm font-medium text-textMuted mb-1">Deal method</label>
               <select
                 value={dealMethod}
                 onChange={(e) => setDealMethod(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="field px-3 py-2.5 text-sm"
               >
                 <option value="full_hand_at_start">Full hand at start</option>
                 <option value="one_at_a_time">One at a time</option>
@@ -179,7 +179,7 @@ export default function GameSetupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl disabled:opacity-50"
+              className="btn-primary w-full py-3"
             >
               {loading ? 'Creating…' : 'Create Game'}
             </button>
@@ -187,22 +187,22 @@ export default function GameSetupPage() {
         ) : (
           <form onSubmit={handleJoin} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Game code</label>
+              <label className="block text-sm font-medium text-textMuted mb-1">Game code</label>
               <input
                 type="text"
                 value={gameCode}
                 onChange={(e) => setGameCode(e.target.value.toUpperCase().slice(0, 6))}
                 placeholder="e.g. ABC123"
                 maxLength={6}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm tracking-widest uppercase font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="field px-3 py-2.5 text-sm tracking-widest uppercase font-mono"
               />
-              <p className="mt-1 text-xs text-gray-400">6-character code from the host</p>
+              <p className="mt-1 text-xs text-textFaint">6-character code from the host</p>
             </div>
 
             <button
               type="submit"
               disabled={loading || gameCode.length < 6}
-              className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl disabled:opacity-50"
+              className="btn-primary w-full py-3"
             >
               {loading ? 'Joining…' : 'Join Game'}
             </button>

@@ -38,37 +38,40 @@ export default function HomePage() {
   const initials = user?.username?.slice(0, 2).toUpperCase() || '?';
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
-      <main className="flex-1 px-5 pt-12 pb-28">
+    <div
+      className="flex flex-col min-h-screen bg-bg"
+      style={{ paddingTop: 'var(--safe-top)' }}
+    >
+      <main className="flex-1 px-5 pt-10" style={{ paddingBottom: 'calc(var(--nav-height) + 2rem)' }}>
 
         {/* ── Greeting + avatar ── */}
-        <div className="flex items-start justify-between mb-9">
-          <div>
-            <p className="text-sm font-medium text-indigo-500 mb-0.5">{greeting}</p>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-              {user?.username}
+        <div className="flex items-start justify-between mb-8">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-accent mb-0.5">{greeting}</p>
+            <h1 className="text-3xl font-bold tracking-tight text-text truncate">
+              Hi {user?.username}
             </h1>
-            <p className="text-gray-400 text-sm mt-1">What are we playing today?</p>
+            <p className="text-textMuted text-sm mt-1">What are we playing today?</p>
           </div>
 
           {/* Avatar + dropdown */}
-          <div className="relative flex-none mt-1" ref={menuRef}>
+          <div className="relative flex-none mt-1 ml-3" ref={menuRef}>
             <button
               onClick={() => setMenuOpen((o) => !o)}
-              className="w-10 h-10 rounded-full bg-indigo-600 text-white text-sm font-bold flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="w-10 h-10 rounded-full bg-accent text-black text-sm font-bold flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-accentMuted"
               aria-label="Profile menu"
             >
               {initials}
             </button>
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
-                <div className="px-4 py-2.5 border-b border-gray-100">
-                  <p className="text-sm font-semibold text-gray-900">{user?.username}</p>
-                  <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+              <div className="absolute right-0 mt-2 w-48 panel shadow-lg py-1 z-50">
+                <div className="px-4 py-2.5 border-b border-border">
+                  <p className="text-sm font-semibold text-text">{user?.username}</p>
+                  <p className="text-xs text-textMuted truncate">{user?.email}</p>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  className="w-full text-left px-4 py-2.5 text-sm text-error hover:bg-surface3 transition-colors"
                 >
                   Log Out
                 </button>
@@ -81,48 +84,51 @@ export default function HomePage() {
         <div className="flex flex-col gap-3 mb-9">
           <ActionCard
             icon={<CardIcon />}
-            accent="bg-indigo-50 text-indigo-600"
-            label="Create a Card"
+            label="Create Card"
             sublabel="Design a new card for your library"
             onClick={() => navigate('/cards/new')}
           />
           <ActionCard
             icon={<DeckIcon />}
-            accent="bg-emerald-50 text-emerald-600"
-            label="Build a Deck"
-            sublabel="Arrange cards into a playable deck"
+            label="Build Deck"
+            sublabel="Combine cards into a playable deck"
             onClick={() => navigate('/decks/new')}
           />
           <ActionCard
             icon={<GameIcon />}
-            accent="bg-amber-50 text-amber-600"
-            label="Start a Game"
-            sublabel="Host a session and invite players"
+            label="Start Game"
+            sublabel="Host a game with your deck"
             onClick={() => navigate('/games/setup')}
+          />
+          <ActionCard
+            icon={<JoinIcon />}
+            label="Join Game"
+            sublabel="Enter a code to join a session"
+            onClick={() => navigate('/games/setup', { state: { tab: 'join' } })}
           />
         </div>
 
         {/* ── Recent deck ── */}
         {recentDeck && (
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5">
+            <p className="text-xs font-semibold text-textFaint uppercase tracking-wider mb-2.5">
               Jump back in
             </p>
             <button
               onClick={() =>
                 navigate('/games/setup', { state: { deck_id: recentDeck.deck_id } })
               }
-              className="w-full bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-4 flex items-center justify-between active:bg-gray-50 transition-colors"
+              className="w-full panel px-4 py-4 flex items-center justify-between hover:border-borderAccent transition-colors"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 flex-none">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-surface3 flex items-center justify-center text-accent flex-none">
                   <DeckIcon small />
                 </div>
-                <div className="flex flex-col items-start">
-                  <span className="font-semibold text-gray-900 text-sm leading-snug">
+                <div className="flex flex-col items-start min-w-0">
+                  <span className="font-semibold text-text text-sm leading-snug truncate">
                     {recentDeck.deck_name}
                   </span>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-textMuted">
                     {recentDeck.card_count} {recentDeck.card_count === 1 ? 'card' : 'cards'}
                   </span>
                 </div>
@@ -138,18 +144,18 @@ export default function HomePage() {
   );
 }
 
-function ActionCard({ icon, accent, label, sublabel, onClick }) {
+function ActionCard({ icon, label, sublabel, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="w-full bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-4 flex items-center gap-4 active:bg-gray-50 transition-colors text-left"
+      className="group w-full panel px-4 py-4 flex items-center gap-4 transition-all text-left hover:border-borderAccent hover:shadow-[var(--shadow-accent)]"
     >
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-none ${accent}`}>
+      <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-none bg-accentMuted text-accent">
         {icon}
       </div>
       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-        <span className="font-semibold text-gray-900 text-sm">{label}</span>
-        <span className="text-xs text-gray-400 truncate">{sublabel}</span>
+        <span className="font-semibold text-text text-sm">{label}</span>
+        <span className="text-xs text-textMuted truncate">{sublabel}</span>
       </div>
       <ChevronRight />
     </button>
@@ -189,9 +195,19 @@ function GameIcon() {
   );
 }
 
+function JoinIcon() {
+  return (
+    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+      <polyline points="10 17 15 12 10 7" />
+      <line x1="15" y1="12" x2="3" y2="12" />
+    </svg>
+  );
+}
+
 function ChevronRight() {
   return (
-    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-gray-300 flex-none">
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-textFaint flex-none">
       <polyline points="9 18 15 12 9 6" />
     </svg>
   );

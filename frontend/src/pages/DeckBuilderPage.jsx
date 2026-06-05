@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '../api';
 import CardThumbnail from '../components/cards/CardThumbnail';
+import CardFaceThumbnail from '../components/cards/CardFaceThumbnail';
 import FlippableCard from '../components/cards/FlippableCard';
 import CardBuilderForm from '../components/cards/CardBuilderForm';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -52,6 +53,7 @@ export default function DeckBuilderPage() {
             card_id: c.card_id,
             card_name: c.card_name,
             front_text: c.front_text,
+            front_image_url: c.front_image_url,
             is_unique: c.is_unique,
             quantity: c.quantity || 1,
           })));
@@ -81,6 +83,7 @@ export default function DeckBuilderPage() {
         card_id: card.card_id,
         card_name: card.card_name,
         front_text: card.front_text,
+        front_image_url: card.front_image_url,
         is_unique: card.is_unique,
         quantity: qty,
       }];
@@ -146,16 +149,16 @@ export default function DeckBuilderPage() {
   if (loadingDeck) return <LoadingSpinner />;
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-bg" style={{ paddingTop: 'var(--safe-top)' }}>
       {/* Header */}
-      <header className="flex items-center justify-between px-4 h-14 bg-white border-b border-gray-100 sticky top-0 z-40">
+      <header className="flex items-center justify-between px-4 h-14 bg-surface border-b border-border sticky top-0 z-40">
         <button
           onClick={() => (step > 1 ? setStep(step - 1) : navigate(-1))}
-          className="text-gray-500 text-sm font-medium min-h-[44px] flex items-center"
+          className="text-textMuted text-sm font-medium min-h-[44px] flex items-center"
         >
           ← {step > 1 ? 'Back' : 'Cancel'}
         </button>
-        <span className="font-semibold text-gray-900 text-sm">
+        <span className="font-bold text-text text-sm">
           {isEdit ? 'Edit Deck' : 'New Deck'} · {step}/{TOTAL_STEPS}
         </span>
         {step < TOTAL_STEPS ? (
@@ -165,7 +168,7 @@ export default function DeckBuilderPage() {
               setError('');
               setStep(step + 1);
             }}
-            className="text-blue-600 text-sm font-semibold min-h-[44px] flex items-center"
+            className="text-accent text-sm font-semibold min-h-[44px] flex items-center"
           >
             Next →
           </button>
@@ -173,7 +176,7 @@ export default function DeckBuilderPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="text-blue-600 text-sm font-semibold disabled:opacity-50 min-h-[44px] flex items-center"
+            className="text-accent text-sm font-semibold disabled:opacity-50 min-h-[44px] flex items-center"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
@@ -181,22 +184,22 @@ export default function DeckBuilderPage() {
       </header>
 
       {/* Step indicator */}
-      <div className="flex gap-1 px-4 py-3 bg-white border-b border-gray-100">
+      <div className="flex gap-1 px-4 py-3 bg-surface border-b border-border">
         {Array.from({ length: TOTAL_STEPS }, (_, i) => (
           <div
             key={i}
-            className={`flex-1 h-1 rounded-full transition-colors ${i < step ? 'bg-blue-600' : 'bg-gray-200'}`}
+            className={`flex-1 h-1 rounded-full transition-colors ${i < step ? 'bg-accent' : 'bg-surface3'}`}
           />
         ))}
       </div>
 
       <main className="flex-1 px-4 pt-6 pb-8 flex flex-col gap-5">
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && <p className="text-error text-sm">{error}</p>}
 
         {/* Step 1: Basic info */}
         {step === 1 && (
           <>
-            <h2 className="font-bold text-gray-900 text-lg">Deck Details</h2>
+            <h2 className="font-bold text-text text-lg">Deck Details</h2>
             <Field label="Deck Name" required>
               <input
                 type="text"
@@ -222,7 +225,7 @@ export default function DeckBuilderPage() {
         {/* Step 2: Deck rules */}
         {step === 2 && (
           <>
-            <h2 className="font-bold text-gray-900 text-lg">Deck Rules</h2>
+            <h2 className="font-bold text-text text-lg">Deck Rules</h2>
             <Field
               label="Shuffle deck before game?"
               hint="Should the deck be shuffled into a random order when the game starts?"
@@ -250,18 +253,18 @@ export default function DeckBuilderPage() {
               </select>
             </Field>
             {noDuplicates && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+              <div className="bg-accentMuted border border-borderAccent rounded-lg px-3 py-2 text-xs text-warning">
                 With "no duplicates" selected, every card in this deck will be capped at 1 copy. You can still adjust quantities on the next step but they won't go above 1.
               </div>
             )}
-            <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between panel px-4 py-3">
               <div className="flex-1 pr-4">
-                <p className="text-sm font-medium text-gray-700">Hide discard pile</p>
-                <p className="text-xs text-gray-400 mt-0.5">When enabled, played cards will not be shown to other players.</p>
+                <p className="text-sm font-medium text-text">Hide discard pile</p>
+                <p className="text-xs text-textMuted mt-0.5">When enabled, played cards will not be shown to other players.</p>
               </div>
               <button
                 onClick={() => setHideDiscardPile((v) => !v)}
-                className={`w-12 h-6 rounded-full transition-colors flex-none ${hideDiscardPile ? 'bg-blue-600' : 'bg-gray-300'}`}
+                className={`w-12 h-6 rounded-full transition-colors flex-none ${hideDiscardPile ? 'bg-accent' : 'bg-surface3'}`}
                 role="switch"
                 aria-checked={hideDiscardPile}
               >
@@ -278,8 +281,8 @@ export default function DeckBuilderPage() {
         {/* Step 3: Card library */}
         {step === 3 && (
           <>
-            <h2 className="font-bold text-gray-900 text-lg">Add Cards</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="font-bold text-text text-lg">Add Cards</h2>
+            <p className="text-sm text-textMuted">
               {selectedCards.length} card type{selectedCards.length !== 1 ? 's' : ''} selected · {totalSelected} total copies
             </p>
             <input
@@ -291,13 +294,13 @@ export default function DeckBuilderPage() {
             />
             {loadingCards && <LoadingSpinner />}
             {!loadingCards && filteredLibrary.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-8">No cards found.</p>
+              <p className="text-sm text-textMuted text-center py-8">No cards found.</p>
             )}
             <div className="grid grid-cols-2 gap-3">
               {/* New Card tile — always first */}
               <button
                 onClick={() => setShowCardBuilder(true)}
-                className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 min-h-[160px] text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-surface2 min-h-[160px] text-textMuted hover:border-borderAccent hover:text-accent transition-colors"
               >
                 <span className="text-3xl font-light leading-none">+</span>
                 <span className="text-xs font-medium">New Card</span>
@@ -322,22 +325,22 @@ export default function DeckBuilderPage() {
         {/* Step 4: Quantities */}
         {step === 4 && (
           <>
-            <h2 className="font-bold text-gray-900 text-lg">Set Quantities</h2>
+            <h2 className="font-bold text-text text-lg">Set Quantities</h2>
 
             {/* Running tally */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex justify-between items-center">
-              <span className="text-sm text-blue-700 font-medium">Cards in deck</span>
-              <span className="text-xl font-bold text-blue-700">{totalSelected}</span>
+            <div className="panel border-borderAccent bg-accentMuted px-4 py-3 flex justify-between items-center">
+              <span className="text-sm text-accent font-medium">Cards in deck</span>
+              <span className="text-xl font-bold text-accent">{totalSelected}</span>
             </div>
 
             {noDuplicates && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+              <div className="bg-accentMuted border border-borderAccent rounded-lg px-3 py-2 text-xs text-warning">
                 This deck is set to "no duplicates" — each card is capped at 1 copy.
               </div>
             )}
 
             {selectedCards.length === 0 ? (
-              <p className="text-sm text-gray-400 py-8 text-center">No cards added yet. Go back to step 3.</p>
+              <p className="text-sm text-textMuted py-8 text-center">No cards added yet. Go back to step 3.</p>
             ) : (
               <ul className="flex flex-col gap-3">
                 {selectedCards.map((card) => {
@@ -345,38 +348,39 @@ export default function DeckBuilderPage() {
                   return (
                     <li
                       key={card.card_id}
-                      className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3"
+                      className="panel px-3 py-3 flex items-center gap-3"
                     >
+                      <MiniCardFace name={card.card_name} text={card.front_text} imageUrl={card.front_image_url} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-semibold text-gray-900 truncate">{card.card_name}</p>
+                          <p className="text-sm font-semibold text-text truncate">{card.card_name}</p>
                           {card.is_unique && (
-                            <span className="text-[10px] font-medium text-purple-600 bg-purple-50 rounded px-1 py-0.5 shrink-0">Unique</span>
+                            <span className="text-[10px] font-medium text-accent bg-accentMuted rounded px-1 py-0.5 shrink-0">Unique</span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 truncate">{card.front_text}</p>
+                        <p className="text-xs text-textMuted truncate">{card.front_text}</p>
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           onClick={() => changeQuantity(card.card_id, -1)}
                           disabled={card.quantity <= 1}
-                          className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30"
+                          className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-text hover:bg-surface3 disabled:opacity-30"
                         >
                           −
                         </button>
-                        <span className="w-5 text-center text-sm font-bold text-gray-900">{card.quantity}</span>
+                        <span className="w-5 text-center text-sm font-bold text-text">{card.quantity}</span>
                         <button
                           onClick={() => changeQuantity(card.card_id, 1)}
                           disabled={capped}
-                          className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30"
+                          className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-text hover:bg-surface3 disabled:opacity-30"
                           title={capped ? (card.is_unique ? 'This card is unique — max 1 copy' : 'Deck is set to no duplicates') : undefined}
                         >
                           +
                         </button>
                         <button
                           onClick={() => removeCard(card.card_id)}
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-red-400 hover:bg-red-50 ml-1"
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-error hover:bg-error/15 ml-1"
                           aria-label="Remove card from deck"
                         >
                           ×
@@ -393,8 +397,8 @@ export default function DeckBuilderPage() {
         {/* Step 5: Overview */}
         {step === 5 && (
           <>
-            <h2 className="font-bold text-gray-900 text-lg">Review Deck</h2>
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-col gap-2">
+            <h2 className="font-bold text-text text-lg">Review Deck</h2>
+            <div className="panel p-4 flex flex-col gap-2">
               <Row label="Name" value={deckName} />
               {totalCards && <Row label="Max cards" value={totalCards} />}
               <Row label="Cards selected" value={`${selectedCards.length} types · ${totalSelected} total copies`} />
@@ -406,9 +410,12 @@ export default function DeckBuilderPage() {
             {selectedCards.length > 0 && (
               <div className="grid grid-cols-2 gap-3">
                 {selectedCards.map((card) => (
-                  <div key={card.card_id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{card.card_name}</p>
-                    <p className="text-xs text-gray-500">×{card.quantity}</p>
+                  <div key={card.card_id} className="panel p-3 flex items-center gap-2">
+                    <MiniCardFace name={card.card_name} text={card.front_text} imageUrl={card.front_image_url} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-text truncate">{card.card_name}</p>
+                      <p className="text-xs text-textMuted">×{card.quantity}</p>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -419,7 +426,7 @@ export default function DeckBuilderPage() {
 
       {/* ── New card builder overlay ── */}
       {showCardBuilder && (
-        <div className="fixed inset-0 z-50 bg-gray-50 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-bg overflow-y-auto">
           <CardBuilderForm
             onSaved={(newCard) => {
               setLibrary((prev) => [newCard, ...prev]);
@@ -445,16 +452,16 @@ export default function DeckBuilderPage() {
 }
 
 // Small helpers
-const inputClass = 'w-full border border-gray-300 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white';
+const inputClass = 'field px-3 py-3 text-sm';
 
 function Field({ label, hint, required, children }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-0.5">
+      <label className="block text-sm font-medium text-textMuted mb-0.5">
         {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
+        {required && <span className="text-error ml-0.5">*</span>}
       </label>
-      {hint && <p className="text-xs text-gray-400 mb-1.5">{hint}</p>}
+      {hint && <p className="text-xs text-textFaint mb-1.5">{hint}</p>}
       {children}
     </div>
   );
@@ -463,9 +470,23 @@ function Field({ label, hint, required, children }) {
 function Row({ label, value }) {
   return (
     <div className="flex justify-between text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="font-medium text-gray-900">{value}</span>
+      <span className="text-textMuted">{label}</span>
+      <span className="font-medium text-text">{value}</span>
     </div>
+  );
+}
+
+// Small white card-face thumbnail used in the quantities + review steps.
+// Shows the card's front image if present, otherwise its front text, on a light face.
+function MiniCardFace({ name, text, imageUrl }) {
+  return (
+    <CardFaceThumbnail
+      imageUrl={imageUrl}
+      text={text}
+      name={name}
+      textClassName="text-[8px]"
+      className="flex-none w-11 h-16 rounded-md border border-gray-200 shadow-sm"
+    />
   );
 }
 
@@ -482,16 +503,17 @@ function CardInspectSheet({ card, isAdded, onAdd, onRemove, onClose }) {
 
       {/* Sheet */}
       <div
-        className="relative bg-white rounded-t-3xl px-5 pt-5 pb-8 flex flex-col gap-5 max-h-[85vh] overflow-y-auto"
+        className="relative bg-surface2 border-t border-border rounded-t-3xl px-5 pt-5 pb-8 flex flex-col gap-5 max-h-[85vh] overflow-y-auto"
+        style={{ paddingBottom: 'calc(2rem + var(--safe-bottom))' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Drag handle + close */}
         <div className="flex items-center justify-between">
-          <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto absolute left-1/2 -translate-x-1/2 top-3" />
-          <h2 className="text-base font-bold text-gray-900 truncate flex-1">{card.card_name}</h2>
+          <div className="w-10 h-1 rounded-full bg-surface3 mx-auto absolute left-1/2 -translate-x-1/2 top-3" />
+          <h2 className="text-base font-bold text-text truncate flex-1">{card.card_name}</h2>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-lg leading-none flex-none ml-2"
+            className="w-8 h-8 rounded-full bg-surface3 flex items-center justify-center text-textMuted text-lg leading-none flex-none ml-2"
             aria-label="Close"
           >
             ×
@@ -511,11 +533,11 @@ function CardInspectSheet({ card, isAdded, onAdd, onRemove, onClose }) {
             onSelect={() => setFlipped((f) => !f)}
             size="library"
           />
-          <p className="text-xs text-gray-400">Tap card to flip</p>
+          <p className="text-xs text-textMuted">Tap card to flip</p>
         </div>
 
         {/* Card rules */}
-        <div className="bg-gray-50 rounded-2xl px-4 py-3 flex flex-col gap-2.5">
+        <div className="bg-bg rounded-2xl border border-border px-4 py-3 flex flex-col gap-2.5">
           <RuleRow label="Default copies" value={card.default_copies ?? 1} />
           <RuleRow label="Unique card" value={card.is_unique ? 'Yes — max 1 copy per deck' : 'No'} />
         </div>
@@ -524,14 +546,14 @@ function CardInspectSheet({ card, isAdded, onAdd, onRemove, onClose }) {
         {isAdded ? (
           <button
             onClick={onRemove}
-            className="w-full py-3.5 rounded-2xl border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50 transition-colors"
+            className="w-full py-3.5 rounded-2xl border border-error/40 text-error text-sm font-semibold hover:bg-error/15 transition-colors"
           >
             Remove from Deck
           </button>
         ) : (
           <button
             onClick={onAdd}
-            className="w-full py-3.5 rounded-2xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+            className="btn-primary w-full py-3.5 rounded-2xl text-sm"
           >
             Add to Deck
           </button>
@@ -544,8 +566,8 @@ function CardInspectSheet({ card, isAdded, onAdd, onRemove, onClose }) {
 function RuleRow({ label, value }) {
   return (
     <div className="flex justify-between items-center text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="font-medium text-gray-900">{value}</span>
+      <span className="text-textMuted">{label}</span>
+      <span className="font-medium text-text">{value}</span>
     </div>
   );
 }

@@ -75,32 +75,32 @@ export default function GameBoard({ boardCards, isHost, onClearBoard, scale, onS
   }, [onScaleChange]);
 
   return (
-    <div className={`relative flex flex-col border-r border-slate-700 ${className}`}>
+    <div className={`relative flex flex-col border-r border-border ${className}`}>
 
       {/* Toolbar */}
-      <div className="flex-none flex items-center justify-between px-1.5 py-0.5 border-b border-slate-700 bg-slate-800">
+      <div className="flex-none flex items-center justify-between px-1.5 py-0.5 border-b border-border bg-surface">
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => onScaleChange(Math.max(0.5, +(scale - 0.25).toFixed(2)))}
-            className="w-6 h-6 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold flex items-center justify-center"
+            className="w-6 h-6 rounded bg-surface3 hover:bg-surface2 text-text text-xs font-bold flex items-center justify-center"
           >
             −
           </button>
-          <span className="text-xs text-slate-400 w-9 text-center">
+          <span className="text-xs text-textMuted w-9 text-center">
             {Math.round(scale * 100)}%
           </span>
           <button
             onClick={() => onScaleChange(Math.min(2, +(scale + 0.25).toFixed(2)))}
-            className="w-6 h-6 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold flex items-center justify-center"
+            className="w-6 h-6 rounded bg-surface3 hover:bg-surface2 text-text text-xs font-bold flex items-center justify-center"
           >
             +
           </button>
         </div>
-        <span className="text-xs text-slate-600 font-medium">Board</span>
+        <span className="text-xs text-textFaint font-medium">Board</span>
         {isHost && boardCards.length > 0 ? (
           <button
             onClick={onClearBoard}
-            className="text-xs text-red-400 hover:text-red-300 px-1.5 py-0.5"
+            className="text-xs text-error hover:opacity-80 px-1.5 py-0.5"
           >
             Clear
           </button>
@@ -110,14 +110,14 @@ export default function GameBoard({ boardCards, isHost, onClearBoard, scale, onS
       </div>
 
       {/* Droppable canvas */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 overflow-hidden relative board-dotgrid">
         <div
           ref={setRefs}
-          className={`absolute inset-0 transition-colors ${isOver ? 'bg-indigo-900/20' : ''}`}
+          className={`absolute inset-0 transition-colors ${isOver ? 'bg-accentMuted' : ''}`}
         >
           {boardCards.length === 0 && !isOver && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <p className="text-xs text-slate-600">Drag cards here</p>
+              <p className="text-xs text-textFaint">Drag cards here</p>
             </div>
           )}
           {/* Scaled inner canvas */}

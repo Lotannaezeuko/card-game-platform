@@ -1,14 +1,19 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../api';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, token, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Already signed in? Skip the form and go straight to the app.
+  if (!authLoading && token) {
+    return <Navigate to="/home" replace />;
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();

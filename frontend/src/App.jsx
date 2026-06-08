@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
@@ -21,6 +21,20 @@ const Placeholder = ({ name }) => (
   <div className="flex items-center justify-center min-h-screen bg-bg text-textMuted">{name} — coming soon</div>
 );
 
+// Landing redirect for "/": send authenticated users to the app, others to login.
+// Waits for auth rehydration so a logged-in user is never bounced to /login on open/reload.
+function RootRedirect() {
+  const { token, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-bg">
+        <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+  return <Navigate to={token ? '/home' : '/login'} replace />;
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -28,7 +42,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           {/* Public */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/join" element={<GuestJoinPage />} />
